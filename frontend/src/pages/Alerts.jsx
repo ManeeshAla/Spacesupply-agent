@@ -1,21 +1,29 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AlertTriangle, Check, Info, OctagonAlert } from 'lucide-react'
 import { post } from '../api'
 import { useApp, useFetch } from '../ctx'
 import { Badge, Panel, Spinner, sevTone } from '../ui'
 
 export default function Alerts({ openTask, openComponent }) {
-  const { bump } = useApp()
+  const { bump, filters } = useApp()
   const { data, loading } = useFetch('/alerts', 8000)
   const [f, setF] = useState('OPEN')
   const [sev, setSev] = useState('ALL')
+  const [stage, setStage] = useState(0)
+  // the chat can set these filters for us ("show critical alerts for stage 3")
+  useEffect(() => { if (filters.alertStatus) setF(filters.alertStatus) }, [filters.alertStatus])
+  useEffect(() => { if (filters.alertSeverity) setSev(filters.alertSeverity) }, [filters.alertSeverity])
+  useEffect(() => { if (filters.alertStage != null) setStage(Number(filters.alertStage) || 0) }, [filters.alertStage])
   if (loading || !data) return <Spinner />
-  const rows = data.filter((a) => (f === 'ALL' || a.status === f) && (sev === 'ALL' || a.severity === sev))
+  const rows = data.filter((a) => (f === 'ALL' || a.status === f) && (sev === 'ALL' || a.severity === sev)
+    && (!stage || a.stage_id === stage))
   const Icon = ({ s }) => (s === 'CRITICAL' ? <OctagonAlert className="text-bad" size={20} /> : s === 'WARNING' ? <AlertTriangle className="text-warn" size={20} /> : <Info className="text-accent-soft" size={20} />)
   return (
     <Panel title={`Alerts (${rows.length})`} right={<div className="flex gap-2">
       <select className="input" value={f} onChange={(e) => setF(e.target.value)}>{['OPEN', 'ACKNOWLEDGED', 'RESOLVED', 'ALL'].map((x) => <option key={x}>{x}</option>)}</select>
-      <select className="input" value={sev} onChange={(e) => setSev(e.target.value)}>{['ALL', 'CRITICAL', 'WARNING', 'INFO'].map((x) => <option key={x}>{x}</option>)}</select></div>}>
+      <select className="input" value={sev} onChange={(e) => setSev(e.target.value)}>{['ALL', 'CRITICAL', 'WARNING', 'INFO'].map((x) => <option key={x}>{x}</option>)}</select>
+      <select className="input" value={stage} onChange={(e) => setStage(Number(e.target.value))}>
+        <option value={0}>All stages</option>{[1, 2, 3, 4].map((s) => <option key={s} value={s}>Stage {s}</option>)}</select></div>}>
       <ul className="space-y-2">{rows.length === 0 && <li className="p-4 text-sm text-slate-400">Nothing here.</li>}{rows.map((a) => (
         <li key={a.id} className="flex gap-3 rounded-xl border border-line bg-space-900/60 p-3"><Icon s={a.severity} />
           <div className="min-w-0 flex-1">

@@ -37,6 +37,39 @@ def facts_preserved(draft: str, rewritten: str) -> bool:
     return a <= b and not (b - a)
 
 
+# Numbers an answer may always use: list positions, "24 hours" style rephrasing of ratios,
+# and the small integers a model uses to count things it just listed.
+_SAFE_NUMBERS = {str(i) for i in range(0, 11)}
+
+
+def ungrounded_facts(answer: str, sources: str) -> list[str]:
+    """IDs / numbers that appear in the answer but in none of the sources.
+
+    `sources` is the concatenation of every tool result the model saw plus the user's own
+    question, so anything the agents actually returned is allowed. Unlike
+    `facts_preserved` this is one-directional: the model may leave facts out, it may not
+    invent them.
+    """
+    allowed = set(FACT_RE.findall(sources))
+    out = []
+    for tok in FACT_RE.findall(answer):
+        if tok in allowed or tok in _SAFE_NUMBERS:
+            continue
+        # 8 vs 8.0 vs 08 are the same fact
+        try:
+            if any(abs(float(tok) - float(a)) < 1e-9 for a in allowed):
+                continue
+        except ValueError:
+            pass
+        out.append(tok)
+    return sorted(set(out))
+
+
+def facts_grounded(answer: str, sources: str) -> bool:
+    """True if the answer introduces no ID or number that the tools did not return."""
+    return not ungrounded_facts(answer, sources)
+
+
 def polish(question: str, draft: str) -> str | None:
     if not available():
         return None

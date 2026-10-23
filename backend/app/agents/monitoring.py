@@ -31,6 +31,17 @@ class MonitoringAgent:
         db.add(a)
         return a
 
+    def ack(self, db, alert_id: int) -> m.Alert:
+        """Acknowledge one alert. Raises ValueError if the id is unknown."""
+        a = db.get(m.Alert, alert_id)
+        if a is None:
+            raise ValueError(f"Unknown alert {alert_id}")
+        if a.status == "OPEN":
+            a.status = "ACKNOWLEDGED"
+            log(db, NAME, f"Alert {a.id} acknowledged: {a.title}")
+        db.flush()
+        return a
+
     def scan(self, db) -> dict:
         now = now_hour(db)
         active: set[str] = set()

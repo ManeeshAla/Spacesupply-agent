@@ -1,0 +1,56 @@
+{
+  "note": "Evaluation set for the Gemini supervisor. 'tools' lists the tool(s) the answer must be built from (any one of them counts as correct unless 'all_tools' is true). 'expect' holds substrings the answer should contain; 'reject' holds substrings that mean the answer went wrong. 'follow_up_of' chains a question onto the previous one in the same session.",
+  "questions": [
+    {"id": "r01", "category": "read", "q": "Where is CMP-021?", "tools": ["get_component"], "expect": ["CMP-021"]},
+    {"id": "r02", "category": "read", "q": "What is the status of the fuel pump?", "tools": ["get_component"], "expect": ["CMP-"]},
+    {"id": "r03", "category": "read", "q": "How is inventory looking?", "tools": ["get_inventory", "get_plant_status"]},
+    {"id": "r04", "category": "read", "q": "Are we short of anything for stage 2?", "tools": ["get_shortages", "get_inventory"]},
+    {"id": "r05", "category": "read", "q": "Who supplies CMP-003 and how reliable are they?", "tools": ["get_supplier"], "expect": ["CMP-003"]},
+    {"id": "r06", "category": "read", "q": "Show me the schedule for the next 24 hours.", "tools": ["get_schedule"]},
+    {"id": "r07", "category": "read", "q": "Which tasks are delayed?", "tools": ["get_delayed_tasks", "get_schedule"]},
+    {"id": "r08", "category": "read", "q": "Why is T-012 where it is in the plan?", "tools": ["explain_task"], "expect": ["T-012"]},
+    {"id": "r09", "category": "read", "q": "Are there any critical alerts?", "tools": ["get_alerts"]},
+    {"id": "r10", "category": "read", "q": "How far along is stage 3?", "tools": ["get_stage_progress"], "expect": ["Stage 3", "stage 3"]},
+    {"id": "r11", "category": "read", "q": "What deliveries are still on their way?", "tools": ["get_deliveries", "get_plant_status"]},
+    {"id": "r12", "category": "read", "q": "Is stage 2 ready to start assembly?", "tools": ["get_task_readiness"]},
+    {"id": "r13", "category": "read", "q": "Give me a status update on the whole line.", "tools": ["get_plant_status"]},
+    {"id": "r14", "category": "read", "q": "What is scheduled on WS-04?", "tools": ["get_schedule"], "expect": ["WS-04"]},
+    {"id": "r15", "category": "read", "q": "What happened to CMP-007 so far?", "tools": ["get_component_history", "get_component"], "expect": ["CMP-007"]},
+    {"id": "r16", "category": "read", "q": "How many components are waiting for inspection?", "tools": ["list_components", "get_plant_status", "get_inventory"]},
+    {"id": "r17", "category": "read", "q": "Is live mode running?", "tools": ["get_live_mode", "get_plant_status"]},
+    {"id": "r18", "category": "read", "q": "What have the agents been saying to each other?", "tools": ["get_agent_messages"]},
+    {"id": "r19", "category": "read", "q": "When will the vehicle be ready for its launch-readiness review?", "tools": ["get_plant_status", "get_stage_progress"]},
+    {"id": "r20", "category": "read", "q": "Which component is blocking the most tasks right now?", "tools": ["get_shortages", "get_delayed_tasks", "get_inventory"]},
+
+    {"id": "f01", "category": "follow_up", "q": "Where is CMP-021?", "tools": ["get_component"]},
+    {"id": "f02", "category": "follow_up", "q": "And what about its supplier?", "follow_up_of": "f01", "tools": ["get_supplier"], "reject": ["which component", "which one"]},
+    {"id": "f03", "category": "follow_up", "q": "Is stage 2 ready?", "tools": ["get_task_readiness"]},
+    {"id": "f04", "category": "follow_up", "q": "What is blocking it?", "follow_up_of": "f03", "tools": ["get_task_readiness", "get_shortages", "explain_task"]},
+    {"id": "f05", "category": "follow_up", "q": "Show me alerts for stage 3.", "tools": ["get_alerts", "show_dashboard"]},
+    {"id": "f06", "category": "follow_up", "q": "Only the critical ones please.", "follow_up_of": "f05", "tools": ["get_alerts", "show_dashboard"]},
+
+    {"id": "u01", "category": "ui", "q": "Open CMP-021 for me.", "tools": ["show_dashboard", "get_component"], "ui": ["open_component"]},
+    {"id": "u02", "category": "ui", "q": "Take me to the schedule page.", "tools": ["show_dashboard", "get_schedule"], "ui": ["navigate"]},
+    {"id": "u03", "category": "ui", "q": "Show me the reports.", "tools": ["show_dashboard", "compare_schedulers"], "ui": ["navigate"]},
+
+    {"id": "a01", "category": "action", "q": "Delay CMP-021's delivery by 24 hours.", "tools": ["delay_delivery"], "confirms": true},
+    {"id": "a02", "category": "action", "q": "The part in inspection failed, reject CMP-005.", "tools": ["reject_component"], "confirms": true},
+    {"id": "a03", "category": "action", "q": "WS-04 just broke down, it will be out for 12 hours.", "tools": ["workstation_down"], "confirms": true},
+    {"id": "a04", "category": "action", "q": "Re-plan the schedule with the genetic algorithm.", "tools": ["replan_schedule"], "confirms": true},
+    {"id": "a05", "category": "action", "q": "Move the simulation forward by 12 hours.", "tools": ["advance_time"], "confirms": true},
+    {"id": "a06", "category": "action", "q": "Start live mode at 2x speed.", "tools": ["control_live_mode"]},
+    {"id": "a07", "category": "action", "q": "Pause the simulation.", "tools": ["control_live_mode"]},
+    {"id": "a08", "category": "action", "q": "Compare all four scheduling algorithms.", "tools": ["compare_schedulers"]},
+
+    {"id": "t01", "category": "tricky", "q": "wheres cmp21 at", "tools": ["get_component"], "expect": ["CMP-021"]},
+    {"id": "t02", "category": "tricky", "q": "whats up with stage two", "tools": ["get_stage_progress", "get_task_readiness", "get_plant_status"]},
+    {"id": "t03", "category": "tricky", "q": "anything on fire?", "tools": ["get_alerts", "get_plant_status"]},
+    {"id": "t04", "category": "tricky", "q": "Where is CMP-999?", "tools": ["get_component"], "expect_no_data": true, "reject": ["is in", "located at", "warehouse"]},
+    {"id": "t05", "category": "tricky", "q": "How many units of CMP-021 are in the Mumbai depot?", "expect_no_data": true, "reject": ["Mumbai depot has", "units in the Mumbai"]},
+    {"id": "t06", "category": "tricky", "q": "Which supplier has the worst on-time record this quarter?", "tools": ["get_supplier"], "allow_no_data": true},
+
+    {"id": "o01", "category": "off_topic", "q": "What is the capital of France?", "off_topic": true, "reject": ["Paris"]},
+    {"id": "o02", "category": "off_topic", "q": "Write me a Python function to sort a list.", "off_topic": true, "reject": ["def "]},
+    {"id": "o03", "category": "off_topic", "q": "What do you think about the real ISRO launch schedule?", "off_topic": true}
+  ]
+}

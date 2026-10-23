@@ -1,13 +1,17 @@
 """Simulation + autonomy engine.
 
-`Engine.handle_event` is the autonomous loop:
-   event -> (Supply/Tracking agent applies it) -> Scheduling agent re-plans with OR-Tools
-         -> Monitoring agent scans + raises alerts -> dashboard/chat can explain the change.
+`Engine.handle_event` is the autonomous loop. The agents talk to each other over the
+message bus (see bus.py) instead of being called in a hard-coded order:
+   event -> Supply/Tracking agent applies it and publishes a message
+         -> Scheduling agent (subscriber) re-plans with OR-Tools and publishes the result
+         -> Monitoring agent (subscriber) scans + raises alerts
+         -> dashboard/chat can explain the change.
 """
 from __future__ import annotations
 
 import json
 
+from . import bus as bus_mod
 from . import models as m
 from . import seed as seed_mod
 from .agents.base import fmt, iso, log, now_hour
@@ -15,6 +19,7 @@ from .agents.monitoring import MonitoringAgent
 from .agents.scheduling import SchedulingAgent
 from .agents.supply import SupplyAgent
 from .agents.tracking import TrackingAgent
+from .bus import bus
 from .config import MICROLM_METRICS
 from .lifecycle import INSPECTION_HOURS
 
@@ -27,6 +32,67 @@ class Engine:
         self.supply = SupplyAgent()
         self.scheduling = SchedulingAgent()
         self.monitoring = MonitoringAgent()
+        self._cycles: list[dict] = []      # stack of in-flight handle_event contexts
+        self._wire_bus()
+
+    # ------------------------------------------------------------------ message bus
+    def _wire_bus(self) -> None:
+        """Declare who reacts to what. This replaces the old fixed call order."""
+        for topic in (bus_mod.SUPPLIER_DELAY, bus_mod.COMPONENT_REJECTED, bus_mod.WORKSTATION_DOWN,
+                      bus_mod.REPLAN_REQUESTED):
+            bus.subscribe(topic, "Scheduling Agent", self._on_replan_needed)
+        bus.subscribe(bus_mod.SCHEDULE_REPLANNED, "Monitoring Agent", self._on_schedule_replanned)
+
+    @property
+    def _cycle(self) -> dict:
+        """Context of the handle_event call currently running (empty dict if none)."""
+        return self._cycles[-1] if self._cycles else {}
+
+    def _on_replan_needed(self, msg: bus_mod.Message) -> None:
+        """Scheduling Agent reacts to a disruption: re-optimise, then announce the new plan."""
+        cycle = self._cycle
+        db = cycle.get("db")
+        if db is None:
+            return
+        algorithm = msg.payload.get("algorithm", "CPSAT")
+        trigger = msg.payload.get("trigger", msg.summary or "Disruption")
+        res = self.scheduling.plan(db, algorithm, trigger=trigger)
+        cycle["replan"] = res
+        met = res["metrics"]
+        cycle["steps"].append({"agent": "Scheduling Agent",
+                               "action": f"Re-planned with OR-Tools {res['algorithm']}: {len(res['changes'])} task(s) moved, "
+                                         f"{met['tardy_tasks']} projected late, makespan {met['makespan']}h."})
+        bus.publish(db, bus_mod.SCHEDULE_REPLANNED, "Scheduling Agent",
+                    {"version_id": res["version_id"], "algorithm": res["algorithm"], "trigger": trigger,
+                     "metrics": met, "moved_tasks": len(res["changes"]),
+                     "changes": [{k: c[k] for k in ("task_id", "name", "delta_hours", "reason")} for c in res["changes"][:5]]},
+                    summary=f"New plan v{res['version_id']} ({res['algorithm']}): {len(res['changes'])} task(s) moved, "
+                            f"{met['tardy_tasks']} late, makespan {met['makespan']}h",
+                    correlation_id=msg.correlation_id)
+
+    def _on_schedule_replanned(self, msg: bus_mod.Message) -> None:
+        """Monitoring Agent reacts to a new plan: rescan alerts and flag the biggest moves."""
+        cycle = self._cycle
+        db = cycle.get("db")
+        if db is None:
+            return
+        mon = self.monitoring.scan(db)
+        cycle["monitor"] = mon
+        cycle["steps"].append({"agent": "Monitoring Agent",
+                               "action": f"Scan complete: {len(mon['created'])} new alert(s), {mon['resolved']} resolved."})
+        changes = (cycle.get("replan") or {}).get("changes") or []
+        if changes:
+            top = changes[:3]
+            body = "; ".join(f"{c['task_id']} {c['name']}: {self._sign(c['delta_hours'])}h" for c in top)
+            trigger = msg.payload.get("trigger", "re-plan")
+            self.monitoring.post_info(db, f"SCHEDULE_CHANGE:{msg.payload['version_id']}",
+                                      f"Schedule changed – {trigger}",
+                                      f"{len(changes)} task(s) rescheduled. Largest: {body}. Cause: {top[0]['reason']}",
+                                      top[0]["task_id"])
+        bus.publish(db, bus_mod.ALERTS_SCANNED, "Monitoring Agent",
+                    {"created": mon["created"], "resolved": mon["resolved"], "open": mon["open"]},
+                    summary=f"{len(mon['created'])} new alert(s), {mon['resolved']} resolved, {mon['open']} open",
+                    correlation_id=msg.correlation_id)
 
     # ------------------------------------------------------------------ lifecycle
     def bootstrap(self, db) -> None:
@@ -44,54 +110,85 @@ class Engine:
 
     # ------------------------------------------------------------------ events
     def handle_event(self, db, event: dict) -> dict:
+        """Apply a disruption, then let the agents negotiate the response over the bus."""
         kind = (event.get("type") or "").upper()
-        steps: list[dict] = []
-        before = self._kpis(db)
-        if kind == "SUPPLIER_DELAY":
-            cid, hours = event["component_id"], int(event.get("hours", 24))
-            impact = self.supply.register_delay(db, cid, hours)
-            steps.append({"agent": "Supply Agent", "action": f"Registered {hours}h delay on {cid} ({impact['name']}) from {impact['supplier']}; "
-                                                              f"directly blocks {impact['directly_affected'] or 'no pending task'}, "
-                                                              f"{len(impact['downstream_affected'])} downstream task(s) at risk."})
-            trigger = f"Supplier delay: {cid} +{hours}h"
-        elif kind == "REJECT_COMPONENT":
-            cid = event["component_id"]
-            res = self.tracking.reject(db, cid, int(event.get("replacement_hours", 36)))
-            steps.append({"agent": "Tracking Agent", "action": f"{cid} rejected; replacement {res['replacement_delivery']} ordered (ETA +{res['eta_hour'] - now_hour(db)}h)."})
-            impact = res
-            trigger = f"Component rejected: {cid}"
-        elif kind == "WORKSTATION_DOWN":
-            wid, hours = event["workstation_id"], int(event.get("hours", 24))
-            ws = db.get(m.Workstation, wid)
-            if ws is None:
-                raise ValueError(f"Unknown workstation {wid}")
-            ws.status = "DOWN"
-            ws.available_from = max(ws.available_from, now_hour(db)) + hours
-            log(db, "Monitoring Agent", f"{wid} reported down for {hours}h.")
-            steps.append({"agent": "Monitoring Agent", "action": f"{wid} ({ws.name}) is down for {hours}h."})
-            impact = {"workstation": wid, "hours": hours}
-            trigger = f"Workstation down: {wid} {hours}h"
-        elif kind == "ADVANCE_TIME":
+        if kind == "ADVANCE_TIME":
             return self.advance(db, int(event.get("hours", 24)))
-        else:
-            raise ValueError(f"Unknown event type '{kind}'")
+        before = self._kpis(db)
+        cid_ = bus_mod.new_correlation_id()
+        cycle = {"db": db, "steps": [], "correlation_id": cid_}
+        self._cycles.append(cycle)
+        try:
+            steps = cycle["steps"]
+            if kind == "SUPPLIER_DELAY":
+                cid, hours = event["component_id"], int(event.get("hours", 24))
+                impact = self.supply.register_delay(db, cid, hours)
+                action = (f"Registered {hours}h delay on {cid} ({impact['name']}) from {impact['supplier']}; "
+                          f"directly blocks {impact['directly_affected'] or 'no pending task'}, "
+                          f"{len(impact['downstream_affected'])} downstream task(s) at risk.")
+                steps.append({"agent": "Supply Agent", "action": action})
+                trigger = f"Supplier delay: {cid} +{hours}h"
+                topic, sender = bus_mod.SUPPLIER_DELAY, "Supply Agent"
+                payload = {"component_id": cid, "component": impact["name"], "supplier": impact["supplier"],
+                           "hours": hours, "new_eta_hour": impact["new_eta_hour"], "trigger": trigger,
+                           "directly_affected": impact["directly_affected"],
+                           "downstream_affected": impact["downstream_affected"][:10]}
+            elif kind == "REJECT_COMPONENT":
+                cid = event["component_id"]
+                res = self.tracking.reject(db, cid, int(event.get("replacement_hours", 36)))
+                eta_in = res["eta_hour"] - now_hour(db)
+                action = f"{cid} rejected; replacement {res['replacement_delivery']} ordered (ETA +{eta_in}h)."
+                steps.append({"agent": "Tracking Agent", "action": action})
+                impact = res
+                trigger = f"Component rejected: {cid}"
+                topic, sender = bus_mod.COMPONENT_REJECTED, "Tracking Agent"
+                payload = {"component_id": cid, "replacement_delivery": res["replacement_delivery"],
+                           "eta_hour": res["eta_hour"], "eta_in_hours": eta_in, "trigger": trigger}
+            elif kind == "WORKSTATION_DOWN":
+                wid, hours = event["workstation_id"], int(event.get("hours", 24))
+                ws = db.get(m.Workstation, wid)
+                if ws is None:
+                    raise ValueError(f"Unknown workstation {wid}")
+                ws.status = "DOWN"
+                ws.available_from = max(ws.available_from, now_hour(db)) + hours
+                log(db, "Monitoring Agent", f"{wid} reported down for {hours}h.")
+                action = f"{wid} ({ws.name}) is down for {hours}h."
+                steps.append({"agent": "Monitoring Agent", "action": action})
+                impact = {"workstation": wid, "hours": hours}
+                trigger = f"Workstation down: {wid} {hours}h"
+                topic, sender = bus_mod.WORKSTATION_DOWN, "Monitoring Agent"
+                payload = {"workstation_id": wid, "name": ws.name, "hours": hours,
+                           "available_from": ws.available_from, "trigger": trigger}
+            else:
+                raise ValueError(f"Unknown event type '{kind}'")
 
-        res = self.scheduling.plan(db, "CPSAT", trigger=trigger)
-        steps.append({"agent": "Scheduling Agent",
-                      "action": f"Re-planned with OR-Tools CP-SAT: {len(res['changes'])} task(s) moved, {res['metrics']['tardy_tasks']} projected late, "
-                                f"makespan {res['metrics']['makespan']}h."})
-        mon = self.monitoring.scan(db)
-        steps.append({"agent": "Monitoring Agent", "action": f"Scan complete: {len(mon['created'])} new alert(s), {mon['resolved']} resolved."})
-        if res["changes"]:
-            top = res["changes"][:3]
-            body = "; ".join(f"{c['task_id']} {c['name']}: {self._sign(c['delta_hours'])}h" for c in top)
-            alert = self.monitoring.post_info(db, f"SCHEDULE_CHANGE:{res['version_id']}", f"Schedule changed – {trigger}",
-                                              f"{len(res['changes'])} task(s) rescheduled. Largest: {body}. Cause: {top[0]['reason']}",
-                                              top[0]["task_id"])
-        db.commit()
+            # the disruption is on the bus: Scheduling re-plans, then Monitoring scans
+            bus.publish(db, topic, sender, payload, summary=action, correlation_id=cid_)
+            res = cycle.get("replan") or {}
+            db.commit()
+        finally:
+            self._cycles.pop()
         after = self._kpis(db)
-        return {"event": event, "trigger": trigger, "impact": impact, "steps": steps, "schedule_changes": res["changes"][:15],
-                "before": before, "after": after, "version_id": res["version_id"]}
+        return {"event": event, "trigger": trigger, "impact": impact, "steps": cycle["steps"],
+                "schedule_changes": (res.get("changes") or [])[:15], "before": before, "after": after,
+                "version_id": res.get("version_id"), "correlation_id": cid_}
+
+    def request_replan(self, db, algorithm: str = "CPSAT", trigger: str = "Chat request") -> dict:
+        """Publish a re-plan request on the bus (Scheduling re-plans, Monitoring rescans)."""
+        cid_ = bus_mod.new_correlation_id()
+        cycle = {"db": db, "steps": [], "correlation_id": cid_}
+        self._cycles.append(cycle)
+        try:
+            bus.publish(db, bus_mod.REPLAN_REQUESTED, "Language Agent",
+                        {"algorithm": algorithm, "trigger": trigger}, summary=trigger, correlation_id=cid_)
+            res = dict(cycle.get("replan") or {})
+            db.commit()
+        finally:
+            self._cycles.pop()
+        res["steps"] = cycle["steps"]
+        res["monitor"] = cycle.get("monitor")
+        res["correlation_id"] = cid_
+        return res
 
     @staticmethod
     def _sign(h: int) -> str:
@@ -123,6 +220,13 @@ class Engine:
                 replans += 1
         mon = self.monitoring.scan(db)
         log(db, "Scheduling Agent" if replans else "Tracking Agent", f"Advanced simulation {hours}h to {fmt(db, now_hour(db))}; {len(log_lines)} state change(s).")
+        if replans or mon["created"]:
+            # only announce notable hours, so live mode does not flood the bus feed
+            bus.publish(db, bus_mod.TIME_ADVANCED, "Tracking Agent",
+                        {"hours": hours, "to_hour": now_hour(db), "replans": replans,
+                         "changes": log_lines[-10:], "alerts": mon},
+                        summary=f"Clock +{hours}h to {fmt(db, now_hour(db))}: {len(log_lines)} change(s), "
+                                f"{replans} drift re-plan(s), {len(mon['created'])} new alert(s)")
         db.commit()
         return {"event": {"type": "ADVANCE_TIME", "hours": hours}, "from_hour": start, "to_hour": now_hour(db), "now": iso(db, now_hour(db)),
                 "changes": log_lines[-40:], "replans": replans, "alerts": mon, "steps": [
@@ -293,7 +397,20 @@ class Engine:
     def alert_dict(self, db, a: m.Alert) -> dict:
         return {"id": a.id, "severity": a.severity, "category": a.category, "title": a.title, "message": a.message,
                 "task_id": a.task_id, "component_id": a.component_id, "status": a.status, "time": fmt(db, a.created_hour),
-                "created_hour": a.created_hour}
+                "created_hour": a.created_hour, "stage_id": self._alert_stage(db, a)}
+
+    @staticmethod
+    def _alert_stage(db, a: m.Alert) -> int | None:
+        """Stage an alert belongs to, via its task or component (used by the Alerts filter)."""
+        if a.task_id:
+            t = db.get(m.Task, a.task_id)
+            if t:
+                return t.stage_id
+        if a.component_id:
+            c = db.get(m.Component, a.component_id)
+            if c:
+                return c.stage_id
+        return None
 
 
 engine = Engine()

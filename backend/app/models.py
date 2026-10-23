@@ -195,3 +195,17 @@ class AgentLog(Base):
     message: Mapped[str] = mapped_column(Text)
     hour: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class AgentMessage(Base):
+    """One structured message sent from one agent to another over the message bus (see bus.py)."""
+    __tablename__ = "agent_messages"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    topic: Mapped[str] = mapped_column(String(32), index=True)       # supplier.delay | schedule.replanned | ...
+    sender: Mapped[str] = mapped_column(String(24))
+    recipient: Mapped[str] = mapped_column(String(24), default="*")  # "*" = broadcast
+    correlation_id: Mapped[str] = mapped_column(String(36), index=True)  # groups one conversation
+    summary: Mapped[str] = mapped_column(Text, default="")
+    payload_json: Mapped[str] = mapped_column(Text, default="{}")
+    hour: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

@@ -9,14 +9,16 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from . import bus as bus_mod
 from . import models as m
 from .agents.base import fmt, iso, now_hour
-from .config import (BENCHMARK_PATH, MICROLM_METRICS, MICROLM_PATH, SUPERVISOR_ENABLED, SUPERVISOR_INTERVAL_S)
+from .config import (BENCHMARK_PATH, CHAT_EVAL_PATH, MICROLM_METRICS, MICROLM_PATH, SUPERVISOR_ENABLED,
+                     SUPERVISOR_INTERVAL_S)
 from .database import SessionLocal, get_db
 from .engine import engine as eng
 from .lifecycle import GROUP_OF
@@ -86,6 +88,21 @@ class LiveIn(BaseModel):
 
 class ReplanIn(BaseModel):
     algorithm: str = "CPSAT"
+
+
+class AgentChatIn(BaseModel):
+    message: str
+    session_id: str = "default"
+
+
+class ConfirmIn(BaseModel):
+    action_id: str
+    approve: bool = True
+    session_id: str = "default"
+
+
+class ChatSettingsIn(BaseModel):
+    confirm: bool | None = None
 
 
 # ------------------------------------------------------------------ basic
@@ -212,7 +229,7 @@ def task(tid: str, db: Session = Depends(get_db)):
 @app.get("/api/alerts")
 def alerts(status: str | None = None, db: Session = Depends(get_db)):
     q = db.query(m.Alert)
-    if status:
+    if status and status.upper() != "ALL":
         q = q.filter(m.Alert.status == status.upper())
     rank = {"CRITICAL": 0, "WARNING": 1, "INFO": 2}
     rows = q.order_by(m.Alert.id.desc()).limit(200).all()
@@ -253,11 +270,122 @@ def suggest(q: str = Query("", max_length=200)):
     return {"suggestions": get_nlu().suggest(q) if q.strip() else []}
 
 
+# ------------------------------------------------------------------ Gemini supervisor agent
+def _tool_ctx(db):
+    from .assistant.sessions import settings
+    from .assistant.tools import ToolCtx
+    return ToolCtx(db=db, lock=LOCK, confirm=bool(settings["confirm"]))
+
+
+def _clean_message(text: str) -> str:
+    text = (text or "").strip()
+    if not text:
+        raise HTTPException(400, "Empty message")
+    return text[:600]
+
+
+@app.post("/api/chat/agent")
+def chat_agent(body: AgentChatIn, db: Session = Depends(get_db)):
+    """Non-streaming supervisor turn (used by the evaluation script and the tests)."""
+    from .assistant import sessions, supervisor
+    msg = _clean_message(body.message)
+    ctx = _tool_ctx(db)
+    out = supervisor.run(ctx, msg, body.session_id)
+    if out.get("pending_action"):
+        sessions.put(body.session_id, out["pending_action"])
+    return out
+
+
+@app.post("/api/chat/stream")
+async def chat_stream(body: AgentChatIn):
+    """Server-sent events: token | tool_call | tool_result | ui | block | pending | replace | done."""
+    from .assistant import sessions, supervisor
+    msg = _clean_message(body.message)
+
+    async def events():
+        db = SessionLocal()
+        ctx = _tool_ctx(db)
+        try:
+            async for ev in supervisor.astream(ctx, msg, body.session_id):
+                if ev["type"] == "pending":
+                    sessions.put(body.session_id, ev["action"])
+                yield f"data: {json.dumps(ev, default=str)}\n\n"
+        except asyncio.CancelledError:          # client navigated away
+            raise
+        except Exception as exc:
+            yield f"data: {json.dumps({'type': 'done', 'source': 'error', 'answer': f'The assistant failed: {type(exc).__name__}: {exc}', 'grounded': True, 'tools_called': []})}\n\n"
+        finally:
+            db.close()
+
+    return StreamingResponse(events(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.post("/api/chat/confirm")
+def chat_confirm(body: ConfirmIn, db: Session = Depends(get_db)):
+    """Approve or cancel an action the assistant proposed."""
+    from .assistant import sessions, supervisor
+    rec = sessions.take(body.action_id)
+    if rec is None:
+        raise HTTPException(404, "That action is no longer pending (already handled, or it expired).")
+    if not body.approve:
+        return {"ok": True, "approved": False, "answer": supervisor.cancel_note(body.session_id, rec),
+                "tool": rec["tool"], "source": "action"}
+    ctx = _tool_ctx(db)
+    ctx.confirm = False                      # the user just confirmed; run it for real
+    out = supervisor.execute_confirmed(ctx, body.session_id, rec)
+    return {"approved": True, **out}
+
+
+@app.get("/api/chat/config")
+def chat_config():
+    from .assistant import gemini, sessions
+    from .assistant.tools import REGISTRY, write_tools
+    return {"gemini": gemini.status(), "confirm_actions": bool(sessions.settings["confirm"]),
+            "pending_actions": sessions.count(),
+            "tools": [{"name": n, "write": s.write, "description": s.description.split(". ")[0]}
+                      for n, s in sorted(REGISTRY.items())],
+            "write_tools": write_tools()}
+
+
+@app.post("/api/chat/config")
+def set_chat_config(body: ChatSettingsIn):
+    from .assistant import sessions
+    if body.confirm is not None:
+        sessions.settings["confirm"] = bool(body.confirm)
+    return {"confirm_actions": bool(sessions.settings["confirm"])}
+
+
+@app.post("/api/chat/new")
+def chat_new(session_id: str = Query("default")):
+    """Forget one conversation (the UI's 'New chat' button)."""
+    from .assistant import sessions, supervisor
+    supervisor.forget(session_id)
+    sessions.clear()
+    return {"status": "cleared", "session_id": session_id}
+
+
+@app.get("/api/chat/eval")
+def chat_eval():
+    return json.loads(CHAT_EVAL_PATH.read_text()) if CHAT_EVAL_PATH.exists() else None
+
+
+# ------------------------------------------------------------------ agent message bus
+@app.get("/api/bus")
+def agent_bus(since: int = 0, db: Session = Depends(get_db)):
+    msgs = bus_mod.recent(db, since)
+    return {"last_id": bus_mod.last_id(db), "messages": msgs,
+            "topics": sorted({x["topic"] for x in msgs})}
+
+
 @app.get("/api/model")
 def model_info():
     from . import llm
+    from .assistant import gemini
     data = json.loads(MICROLM_METRICS.read_text()) if MICROLM_METRICS.exists() else {}
     data["qwen_layer"] = {"enabled": llm.available(), "model": llm.QWEN_MODEL}
+    data["gemini_layer"] = gemini.status()
+    data["chat_eval"] = json.loads(CHAT_EVAL_PATH.read_text()) if CHAT_EVAL_PATH.exists() else None
     return data
 
 
@@ -295,10 +423,13 @@ def simulate(body: SimIn, db: Session = Depends(get_db)):
 @app.post("/api/reset")
 def reset(db: Session = Depends(get_db)):
     with LOCK:
+        from .assistant import sessions, supervisor
         from .live import live
         live.running = False
         live.clear()
         eng.reset(db)
+        supervisor.reset_memory()     # chat memory refers to a plant state that no longer exists
+        sessions.clear()
         live.push(db, "SYSTEM", "Simulation reset to the initial plant state.", "INFO")
     return {"status": "reset"}
 

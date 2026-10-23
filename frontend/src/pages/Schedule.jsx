@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import Gantt from '../components/Gantt'
 import { post } from '../api'
@@ -6,12 +6,14 @@ import { useApp, useFetch } from '../ctx'
 import { Badge, Panel, STAGE_COLORS, Spinner, fmtDate, hourToDate, nice, sign, statusTone } from '../ui'
 
 export default function Schedule({ openTask }) {
-  const { bump } = useApp()
+  const { bump, filters } = useApp()
   const { data, loading } = useFetch('/schedule', 10000)
   const [algo, setAlgo] = useState('CPSAT')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   const [flt, setFlt] = useState('ACTIVE')
+  // the chat can set this filter for us ("show late tasks", "show stage 2's plan")
+  useEffect(() => { if (filters.schedule) setFlt(String(filters.schedule)) }, [filters.schedule])
   if (loading || !data) return <Spinner />
   const m = data.version.metrics
   const replan = async () => {

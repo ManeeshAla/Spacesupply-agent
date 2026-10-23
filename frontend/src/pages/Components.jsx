@@ -1,15 +1,19 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Search } from 'lucide-react'
-import { useFetch } from '../ctx'
+import { useApp, useFetch } from '../ctx'
 import { Badge, Panel, Spinner, nice, statusTone } from '../ui'
 
 const GROUPS = ['all', 'available', 'in_inspection', 'in_assembly', 'installed', 'on_order', 'rejected']
 
 export default function Components({ openComponent }) {
+  const { filters } = useApp()
   const { data, loading } = useFetch('/components', 10000)
   const [q, setQ] = useState('')
   const [g, setG] = useState('all')
   const [stage, setStage] = useState(0)
+  // the chat can set these filters for us ("show me rejected parts in stage 2")
+  useEffect(() => { if (filters.query != null) setQ(filters.query) }, [filters.query])
+  useEffect(() => { if (filters.stage != null) setStage(Number(filters.stage) || 0) }, [filters.stage])
   if (loading || !data) return <Spinner />
   const rows = data.filter((c) => (g === 'all' || c.group === g) && (!stage || c.stage_id === stage) &&
     (!q || (c.id + c.name + c.location + c.supplier).toLowerCase().includes(q.toLowerCase())))

@@ -5,3 +5,5 @@ __pycache__/
 backend/spacesupply.db*
 frontend/dist/
 .pytest_cache/
+.env
+backend/.env
