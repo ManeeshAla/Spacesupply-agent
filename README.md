@@ -93,17 +93,24 @@ tool-calling chat needs one (without it the chat falls back to the Micro LM and 
 | Variable | Default | Meaning |
 |---|---|---|
 | `GEMINI_API_KEY` | – | free-tier key; without it the chat is Micro LM only |
-| `GEMINI_MODEL` | `gemini-3.8-flash` | primary model (free tier, supports tool calling) |
-| `GEMINI_FALLBACK_MODEL` | `gemini-3.5-flash-lite` | used when the primary reports no quota |
+| `GEMINI_MODEL` | `gemini-3.5-flash-lite` | primary model (free tier, supports tool calling) |
+| `GEMINI_FALLBACK_MODEL` | `gemini-3.1-flash-lite` | used when the primary is out of quota or overloaded |
 | `GEMINI_MAX_RETRIES` | `3` | attempts per model, exponential backoff with jitter |
 | `MAX_TOOL_STEPS` | `6` | tool-calling rounds allowed per question |
 | `CHAT_HISTORY_TURNS` | `8` | turns kept in conversation memory |
 | `CONFIRM_ACTIONS` | `1` | `0` runs simulation actions without asking |
 
-Model choice: Google's pricing page lists both `gemini-3.8-flash` and `gemini-3.5-flash-lite` on the
-free tier with function calling. Flash is primary because its tool choice is better; on a `429` the
-assistant retries with backoff, then switches to Flash-Lite, then to the Micro LM, and the chat shows
-each step. `gemini-2.0-flash` and `gemini-3-pro-preview` are shut down — don't use them.
+Model choice, measured against a real free-tier key rather than taken from the docs: the two
+**lite** models are the usable defaults. `gemini-3.5-flash-lite` and `gemini-3.1-flash-lite` both
+support tool calling and answered in 1–9s. The larger `gemini-3.6-flash` and `gemini-3.8-flash`
+choose tools slightly better, but their free allowance is tiny — on a fresh key they returned
+504/503 and then `429 RESOURCE_EXHAUSTED` within a handful of calls, so they are not a sane default.
+Set one here if you have paid quota. `gemini-2.0-flash` and `gemini-3-pro-preview` are shut down, and
+`gemini-2.5-flash` returns 404 on a new key.
+
+On a `429`, `503` or timeout the assistant retries with exponential backoff, puts that model in a
+60-second cooldown so later turns skip it, switches to the fallback model, and only then drops to the
+Micro LM — each step is reported in the chat.
 
 Other env: `DATABASE_URL` (see `docker-compose.yml` for PostgreSQL), `USE_QWEN=auto|on|off`, `OLLAMA_URL`, `QWEN_MODEL`, `SUPERVISOR_ENABLED=0`.
 
@@ -125,22 +132,44 @@ Press **Play** in the header. The simulated clock then runs by itself: deliverie
 
 ## Evaluation (measured, synthetic data)
 
-**Chat assistant** — 46 questions against the real Gemini API: 20 reads, 6 follow-ups needing memory,
-3 dashboard-control, 8 actions, 6 tricky/no-data, 3 off-topic. A question passes only if the right
-tool was called, the answer contained what it should and nothing it should not, the grounding guard
-passed, an action stopped for confirmation, and the model did not fall back.
+**Chat assistant** — 46 questions run against the real Gemini API: 20 reads, 6 follow-ups needing
+memory, 3 dashboard-control, 8 actions, 6 tricky/no-data, 3 off-topic. A question passes only if the
+right tool was called, the answer contained what it should and nothing it should not, the grounding
+guard passed, an action stopped for confirmation, and the model did not fall back.
 
+Measured on `gemini-3.5-flash-lite`, free tier, October 2026:
+
+| Metric | Result |
+|---|---|
+| **Overall accuracy** | **97.8%** (45/46) |
+| Correct tool chosen | 100% |
+| Answer content | 97.8% |
+| **Grounded answers** (no invented id or number) | **100%** |
+| Confirmation gate respected on actions | 100% |
+| Dashboard commands correct | 100% |
+| Fell back to the Micro LM | 2.2% |
+| Latency median / p90 | 2.6s / 16.1s |
+
+Per category: reads 100%, follow-ups 100%, dashboard control 100%, actions 100%, tricky 100%,
+off-topic 67% (1 of 3).
+
+Reproduce (your numbers will differ a little):
 ```bash
 cd backend
 python scripts/eval_chat.py              # whole set, paced for the free tier
 python scripts/eval_chat.py --only read  # one category
 ```
+Results are written to `backend/artifacts/chat_eval.json` and shown on the Reports page, including
+every failure with its reason.
 
-Results are written to `backend/artifacts/chat_eval.json` and shown on the Reports page (overall and
-per-category accuracy, tool-choice accuracy, grounding rate, fallback rate, median/p90 latency, plus
-every failure with the reason). **This number is not filled in yet in this repo** — it needs a
-Gemini key, and it is a live-API measurement, so you should run it yourself and quote your own
-figure. The 78 offline tests below cover the same behaviour with a scripted fake model.
+**Honest notes on these numbers.** Across five runs of the full set I saw 97.8%, 97.8%, 93.5%,
+97.8%, 97.8% — the single failure moves between questions, so treat ~95% as the real figure rather
+than any one run. The failures were never hallucinations: they were a correct answer phrased without
+repeating the id, and the off-topic question landing on the Micro LM fallback (which has no
+off-topic intent and so answers it badly). Two bugs the live run exposed and fixed are covered by
+tests now: the grounding guard used to flag a correct percentage derived from a fraction
+(reliability `0.89` reported as `89%`), and a failed turn used to leave a half-finished exchange in
+memory that the next question resumed.
 
 **Micro LM** — 106,245 parameters.
 | Split | Intent acc. | Macro F1 | Entity F1 |
@@ -161,10 +190,10 @@ The validation score is inflated by template repetition; the held-out-template t
 On the single vehicle the algorithms almost tie (the problem is dominated by one long component-gated chain); the advantage of optimisation shows on the contended 3-vehicle campaign. Reproduce: `cd backend && python -m scripts.benchmark --n 30`.
 
 ## Tests
-`cd backend && pytest -q` → **78 tests, all offline, no API key needed.**
+`cd backend && pytest -q` → **88 tests, all offline, no API key needed.**
 
 The 34 original tests (schedule feasibility for all algorithms, event flow, lifecycle rules, API,
-chat, Micro LM parameter count) still pass unchanged. The 44 new ones use a scripted
+chat, Micro LM parameter count) still pass unchanged. The 54 new ones use a scripted
 `FakeChatModel` (`backend/tests/fake_llm.py`) in place of Gemini and cover: every read tool against
 every task lifecycle state, tool dispatch and the step budget, the confirmation gate (pending →
 confirm / cancel / replay / demo mode), conversation memory and session isolation, the grounding
@@ -174,10 +203,12 @@ order, and the three-agent message-bus exchange.
 ## Limitations (be upfront in your viva)
 * **Synthetic data only**, and the chat evaluation numbers must be produced by running
   `scripts/eval_chat.py` with your own key — they are a live-API measurement, not a fixed result.
-* **Free-tier rate limits** are real. The exact RPM/RPD are not published per model (Google points at
-  AI Studio), so `eval_chat.py` paces itself at 2.5 s between questions and may still need
-  `--pace` raised. Hitting a limit mid-demo is handled, not prevented: you will see the retry notice
-  and then a Micro LM answer.
+* **Free-tier rate limits are the main practical constraint.** The exact RPM/RPD are not published
+  per model, and the bigger flash models exhaust their free allowance almost immediately (see the
+  model-choice note above). `eval_chat.py` paces itself and may still need `--pace` raised. Hitting a
+  limit mid-demo is handled, not prevented: you see the retry notice, then a Micro LM answer.
+* **Tests do not call the API.** All 88 run offline against a scripted fake model, so they verify the
+  wiring, not Gemini's judgement. Only `scripts/eval_chat.py` measures the real thing.
 * **The grounding guard runs after the answer is streamed**, so a bad answer can be briefly visible
   before it is replaced. Numbers 0–10 are whitelisted (models use them to count what they just
   listed), so a wrong *small* count could slip through.
@@ -189,6 +220,7 @@ order, and the three-agent message-bus exchange.
   improve their products; do not point this at real supplier data without checking their terms.
 * The Micro LM is trained on templates, so free-form phrasing is weaker than a real LLM, and it has
   no action intents — **the offline fallback is read-only** and will say so if you ask it to change
-  something.
+  something. It also has no off-topic intent, so when a fallback happens to catch an off-topic
+  question it answers it badly (this is the one evaluation failure you will sometimes see).
 * The Qwen layer needs Ollama and was not exercised in the build environment; the simulated clock is
   in whole hours; no authentication (prototype).

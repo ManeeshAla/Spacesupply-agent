@@ -33,10 +33,10 @@ SUPERVISOR_ENABLED = os.getenv("SUPERVISOR_ENABLED", "1") == "1"
 
 # ---- Gemini supervisor (free tier). Without a key the chat stays on the Micro LM. ----
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "") or os.getenv("GOOGLE_API_KEY", "")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
-GEMINI_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-3.5-flash-lite")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
+GEMINI_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-3.1-flash-lite")
 GEMINI_TEMPERATURE = float(os.getenv("GEMINI_TEMPERATURE", "0.2"))
-GEMINI_TIMEOUT_S = float(os.getenv("GEMINI_TIMEOUT_S", "45"))
+GEMINI_TIMEOUT_S = float(os.getenv("GEMINI_TIMEOUT_S", "25"))
 GEMINI_MAX_RETRIES = int(os.getenv("GEMINI_MAX_RETRIES", "3"))
 MAX_TOOL_STEPS = int(os.getenv("MAX_TOOL_STEPS", "6"))      # tool-calling rounds per question
 CHAT_HISTORY_TURNS = int(os.getenv("CHAT_HISTORY_TURNS", "8"))  # user+assistant turns kept in memory

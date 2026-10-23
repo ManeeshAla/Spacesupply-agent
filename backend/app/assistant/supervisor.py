@@ -18,7 +18,7 @@ import json
 import time
 from typing import Annotated, Any, AsyncIterator, Callable, TypedDict
 
-from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, RemoveMessage, SystemMessage, ToolMessage
 from langchain_core.tools import StructuredTool
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
@@ -39,6 +39,9 @@ this conversation. Call the tools you need before answering.
 not return it, say you do not have it.
 - If a tool returns an error or an empty result, say so plainly and suggest what would help \
 (for example a component id). Do not guess what the answer might have been.
+- If the question assumes something the data does not contain - a warehouse, depot, supplier, \
+vehicle or metric that does not exist here - say that it does not exist before giving what you \
+do have. Never quietly answer a different question from the one asked.
 - Ids look like CMP-021 (component lot), T-012 (task), WS-04 (workstation), DEL-007 \
 (delivery), SUP-02 (supplier). Stages are 1-4. All times are simulated plant time.
 - For broad questions ("how are things?") call get_plant_status. For anything about one \
@@ -83,21 +86,22 @@ def lc_tools() -> list[StructuredTool]:
 
 # ---------------------------------------------------------------- graph
 def _trim(messages: list[AnyMessage]) -> list[AnyMessage]:
-    """Keep the most recent turns without splitting a tool-call/tool-result pair.
+    """Keep the most recent turns, always starting at a user message.
 
-    The system prompt is never stored in the checkpoint; it is prepended on every call, so
-    changing it takes effect immediately and memory holds only the conversation.
+    Cutting at a fixed message count can begin in the middle of an exchange (a tool call with
+    no user turn before it, or a tool result with no call), which Gemini rejects with a 400.
+    So the cut is moved forward to the next HumanMessage. The system prompt is never stored in
+    the checkpoint; it is prepended on every call, so changing it takes effect immediately.
     """
-    limit = max(4, CHAT_HISTORY_TURNS * 3)
+    limit = max(4, CHAT_HISTORY_TURNS * 4)
     rest = [x for x in messages if not isinstance(x, SystemMessage)]
     if len(rest) <= limit:
-        cut = rest
-    else:
-        cut = rest[-limit:]
-    # a ToolMessage with no preceding tool call is rejected by the API
-    while cut and isinstance(cut[0], ToolMessage):
-        cut = cut[1:]
-    return cut
+        return rest
+    cut = rest[-limit:]
+    for i, msg in enumerate(cut):
+        if isinstance(msg, HumanMessage):
+            return cut[i:]
+    return rest[-1:]          # pathological: no user message in the window; keep the latest
 
 
 async def _agent_node(state: ChatState, config) -> dict:
@@ -135,14 +139,16 @@ async def _stream_model(bind, messages, ctx: ToolCtx):
                         emitted = True
                         ctx.on_token(text)
                 if acc is None:
-                    raise RuntimeError("empty response from the model")
+                    raise gemini.EmptyResponse("empty response from the model")
+                gemini.mark_healthy(name)
                 return _as_ai_message(acc), name
             except Exception as exc:
                 last = exc
                 if emitted or not gemini.is_retryable(exc):
                     raise
                 quota = quota or gemini.is_quota_error(exc)
-                if attempt >= tries - 1:
+                if attempt >= tries - 1 or gemini.is_timeout(exc):
+                    gemini.mark_unhealthy(name)
                     break
                 delay = gemini.backoff_delay(attempt)
                 ctx.on_note(f"{name} is busy or rate-limited; retrying in {delay:.1f}s")
@@ -286,8 +292,12 @@ def _deterministic_answer(ctx: ToolCtx, bad: list[str]) -> str:
     head = (f"I dropped my draft answer because {'a figure' if len(bad) == 1 else 'some figures'} in it "
             "did not come from the agents. Here is exactly what the tools returned:")
     if not ctx.sources:
-        return ("I could not answer that from the plant data, and my draft answer was not backed by any "
-                "tool result, so I have discarded it. Please rephrase the question.")
+        # nothing was looked up, so whatever the model wrote was invented: this question cannot be
+        # answered from the plant at all
+        return ("That is outside what I cover - I answer from this assembly line's own data, and I had "
+                "nothing to look up for it. I can help with component status and history, inventory and "
+                "shortages, suppliers and deliveries, the schedule and why tasks moved, alerts, stage "
+                "readiness, and running simulations such as a supplier delay or a re-plan.")
     lines = []
     for call, src in zip(ctx.called, ctx.sources):
         try:
@@ -340,8 +350,24 @@ async def astream(ctx: ToolCtx, query: str, session_id: str,
                             "model_factory": model_factory or _default_factory},
            "recursion_limit": 2 * MAX_TOOL_STEPS + 6}
 
+    before_ids = await _message_ids(session_id)
+
     async def runner():
         return await graph().ainvoke({"messages": [human], "steps": 0}, config=cfg)
+
+    async def rollback():
+        """A failed turn must not leave a half-finished exchange in memory: the next question
+        would resume mid-conversation (re-issuing the old tool call) and answers would bleed
+        into each other."""
+        try:
+            g = graph()
+            state = await g.aget_state({"configurable": {"thread_id": session_id}})
+            extra = [m for m in (state.values.get("messages") or []) if m.id not in before_ids]
+            if extra:
+                await g.aupdate_state({"configurable": {"thread_id": session_id}},
+                                      {"messages": [RemoveMessage(id=m.id) for m in extra]})
+        except Exception:
+            pass
 
     task = asyncio.create_task(runner())
     text_parts: list[str] = []
@@ -368,6 +394,7 @@ async def astream(ctx: ToolCtx, query: str, session_id: str,
         out = await task
         answer = _last_text(out["messages"]) or "".join(text_parts)
     except gemini.NoApiKey as exc:
+        await rollback()
         yield {"type": "fallback", "reason": "no_key",
                "message": "No Gemini API key is configured, so I am answering with the offline Micro LM. "
                           "It can look things up but cannot run actions."}
@@ -375,14 +402,18 @@ async def astream(ctx: ToolCtx, query: str, session_id: str,
             yield ev
         return
     except gemini.QuotaExceeded as exc:
+        await rollback()
         yield {"type": "fallback", "reason": "quota",
                "message": "The free Gemini quota is exhausted. Answering with the offline Micro LM instead."}
         async for ev in _microlm_stream(ctx, query, "quota", str(exc)):
             yield ev
         return
     except Exception as exc:
+        await rollback()
+        detail = str(exc).strip().splitlines()[0][:140] if str(exc).strip() else ""
         yield {"type": "fallback", "reason": "error",
-               "message": f"The Gemini call failed ({type(exc).__name__}). Answering with the offline Micro LM instead."}
+               "message": f"The Gemini call failed ({type(exc).__name__}{': ' + detail if detail else ''}). "
+                          "Answering with the offline Micro LM instead."}
         async for ev in _microlm_stream(ctx, query, "error", str(exc)):
             yield ev
         return
@@ -393,6 +424,14 @@ async def astream(ctx: ToolCtx, query: str, session_id: str,
     yield {"type": "done", "source": "gemini", "model": ctx.model_used, "answer": final,
            "grounded": not bad, "ungrounded": bad, "tools_called": ctx.called,
            "pending_action": ctx.pending, "latency_ms": int((time.perf_counter() - started) * 1000)}
+
+
+async def _message_ids(session_id: str) -> set:
+    try:
+        state = await graph().aget_state({"configurable": {"thread_id": session_id}})
+        return {m.id for m in (state.values.get("messages") or [])}
+    except Exception:
+        return set()
 
 
 def _last_text(messages) -> str:
@@ -526,7 +565,7 @@ def run(ctx: ToolCtx, query: str, session_id: str,
             events.append(ev)
         return events
 
-    events = asyncio.run(collect())
+    events = gemini.run_sync(collect())
     done = next((e for e in reversed(events) if e["type"] == "done"), None)
     ui = [e["command"] for e in events if e["type"] == "ui"]
     blocks = [e["block"] for e in events if e["type"] == "block"]

@@ -58,9 +58,12 @@ def grade(q: dict, out: dict) -> dict:
     # --- answer content
     answer_ok = True
     if q.get("expect"):
-        if not any(s.lower() in low for s in q["expect"]):
+        # the entity may be named in the prose or proved by the tool arguments: an answer that
+        # lists WS-04's tasks without repeating "WS-04" is right, just differently worded
+        called_with = json.dumps(out.get("tools_called") or [], default=str).lower()
+        if not any(s.lower() in low or s.lower() in called_with for s in q["expect"]):
             answer_ok = False
-            notes.append(f"missing any of {q['expect']}")
+            notes.append(f"neither the answer nor the tool arguments mention any of {q['expect']}")
     for bad in q.get("reject") or []:
         if bad.lower() in low:
             answer_ok = False

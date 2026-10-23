@@ -3,6 +3,9 @@ _tmp = tempfile.mkdtemp()
 os.environ["DATABASE_URL"] = f"sqlite:///{_tmp}/test.db"
 os.environ["SUPERVISOR_ENABLED"] = "0"
 os.environ["USE_QWEN"] = "off"
+# tests must never reach the real API, whatever is in a developer's backend/.env
+os.environ["GEMINI_API_KEY"] = ""
+os.environ["GOOGLE_API_KEY"] = ""
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 import pytest

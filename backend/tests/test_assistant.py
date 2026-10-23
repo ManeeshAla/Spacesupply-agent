@@ -14,6 +14,7 @@ from app.assistant.tools import REGISTRY, ToolCtx, run_tool
 @pytest.fixture(autouse=True)
 def clean_chat():
     supervisor.reset_memory()
+    gemini._cooldown.clear()
     sessions.clear()
     sessions.settings["confirm"] = True
     yield
@@ -409,3 +410,108 @@ def test_old_microlm_chat_endpoint_still_works(client):
     r = client.post("/api/chat", json={"message": "where is CMP-021?"})
     assert r.status_code == 200
     assert "CMP-021" in r.json()["answer"]
+
+
+# ---------------------------------------------------------------- bugs found with the real API
+def test_empty_gemini_response_is_retried(db):
+    """Gemini sometimes returns an empty stream after a tool result: retry, don't give up."""
+    fake = FakeChatModel([{"text": ""}, {"text": "CMP-021 is tracked."}])
+    out = supervisor.run(ctx_for(db), "where is CMP-021?", "empty", model_factory=fake.factory())
+    assert out["source"] == "gemini" and out["answer"] == "CMP-021 is tracked."
+    assert fake.turns == 2
+
+
+def test_timeouts_switch_model_instead_of_retrying(db):
+    err = RuntimeError("504 DEADLINE_EXCEEDED. Deadline expired before operation could complete.")
+    out, _ctx, fake = ask(db, [{"raise": err}] * 6, "show alerts")
+    assert out["source"] == "microlm"
+    assert fake.turns == 2, "one attempt per model, not three"
+
+
+def test_a_failed_turn_leaves_no_half_finished_exchange_in_memory(db):
+    """A tool call followed by a model failure used to be resumed by the NEXT question."""
+    fake = FakeChatModel([
+        {"tools": [("get_supplier", {"component": "CMP-021"})]},
+        {"raise": ValueError("boom")},          # second model turn dies after the tool ran
+        {"text": "Hello again."},
+    ])
+    supervisor.run(ctx_for(db), "who supplies CMP-021?", "poison", model_factory=fake.factory())
+    out = supervisor.run(ctx_for(db), "hello", "poison", model_factory=fake.factory())
+    assert out["source"] == "gemini" and out["tools_called"] == []
+    types = [x.type for x in fake.seen[-1]]
+    assert types == ["system", "human"], f"stale messages leaked into the next turn: {types}"
+
+
+def test_percentages_derived_from_fractions_are_grounded():
+    from app import llm
+    # the id matters: parsing it as a number used to raise and abort every numeric check,
+    # so a correct percentage was reported as invented
+    src = '{"component": "CMP-003", "reliability": 0.89, "lead_time_days": 8}'
+    assert llm.facts_grounded("Sagar Composites supplies CMP-003, 89% reliable, 8 day lead time.", src)
+    assert llm.facts_grounded("Reliability 0.89.", src)
+    assert not llm.facts_grounded("Reliability is 71%.", src)
+    assert not llm.facts_grounded("Lead time is 17 days.", src)
+    assert not llm.facts_grounded("See CMP-777.", src)
+    assert llm.ungrounded_facts("89% and CMP-777 and 17", src) == ["17", "CMP-777"]
+
+
+def test_model_cache_is_per_event_loop(monkeypatch):
+    """A client reused across asyncio.run() calls fails with 'Event loop is closed'."""
+    import asyncio
+    made = []
+    class Dummy:
+        def __init__(self, **kw): made.append(kw["model"])
+    import langchain_google_genai
+    monkeypatch.setattr(langchain_google_genai, "ChatGoogleGenerativeAI", Dummy)
+    gemini._models.clear()
+    async def twice():
+        return gemini.make_model("m"), gemini.make_model("m")
+    a1, a2 = asyncio.run(twice())
+    b1, _ = asyncio.run(twice())
+    assert a1 is a2, "same loop -> reuse"
+    assert a1 is not b1, "new loop -> new client"
+    gemini._models.clear()
+
+
+def test_history_trim_always_starts_at_a_user_message():
+    """Gemini 400s on a window that begins with a tool call or tool result."""
+    from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+    msgs = []
+    for i in range(12):
+        msgs += [HumanMessage(content=f"q{i}"),
+                 AIMessage(content="", tool_calls=[{"name": "get_delayed_tasks", "args": {}, "id": f"c{i}"}]),
+                 ToolMessage(content="{}", tool_call_id=f"c{i}", name="get_delayed_tasks"),
+                 AIMessage(content=f"a{i}")]
+    for n in range(5, len(msgs)):
+        cut = supervisor._trim(msgs[:n])
+        assert cut and isinstance(cut[0], HumanMessage), f"window of {n} starts with {type(cut[0]).__name__}"
+        # every tool result still has its call right before it
+        for j, m in enumerate(cut):
+            if isinstance(m, ToolMessage):
+                assert getattr(cut[j - 1], "tool_calls", None)
+
+
+def test_a_failing_model_is_skipped_for_a_while():
+    first = gemini.model_chain()
+    assert first[0] == gemini.GEMINI_MODEL
+    gemini.mark_unhealthy(gemini.GEMINI_MODEL, 60)
+    assert gemini.model_chain()[0] == gemini.GEMINI_FALLBACK_MODEL
+    assert gemini.GEMINI_MODEL in gemini.model_chain(), "never drop a model entirely"
+    gemini.mark_healthy(gemini.GEMINI_MODEL)
+    assert gemini.model_chain() == first
+
+
+def test_sync_callers_share_one_event_loop(db):
+    a = gemini.background_loop()
+    out = supervisor.run(ctx_for(db), "hello", "loop", model_factory=FakeChatModel([{"text": "hi."}]).factory())
+    assert out["answer"] == "hi." and gemini.background_loop() is a
+
+
+def test_an_ungrounded_answer_with_no_tool_data_is_refused_not_rephrased(db):
+    """An off-topic question the model answered from nowhere: say so, don't ask to rephrase."""
+    out, _ctx, _f = ask(db, [{"text": "ISRO's next launch uses CMP-084 and slips to March."}],
+                        "what do you think of the real ISRO launch schedule?")
+    assert out["grounded"] is False and out["tools_called"] == []
+    assert "CMP-084" not in out["answer"]
+    assert "outside what I cover" in out["answer"]
+    assert "rephrase" not in out["answer"].lower()

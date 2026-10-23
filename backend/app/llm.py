@@ -51,16 +51,27 @@ def ungrounded_facts(answer: str, sources: str) -> list[str]:
     invent them.
     """
     allowed = set(FACT_RE.findall(sources))
+    # parse the numeric tokens once: an id such as CMP-003 in the sources must not abort the
+    # numeric comparison for every other token
+    numbers = []
+    for a in allowed:
+        try:
+            numbers.append(float(a))
+        except ValueError:
+            continue
     out = []
     for tok in FACT_RE.findall(answer):
         if tok in allowed or tok in _SAFE_NUMBERS:
             continue
-        # 8 vs 8.0 vs 08 are the same fact
         try:
-            if any(abs(float(tok) - float(a)) < 1e-9 for a in allowed):
-                continue
+            v = float(tok)
         except ValueError:
-            pass
+            out.append(tok)          # an id that is not in the sources
+            continue
+        if any(abs(v - n) < 1e-9 for n in numbers):
+            continue                 # 8 vs 8.0 vs 08 are the same fact
+        if any(n <= 1.0 and abs(v - round(n * 100)) < 1e-9 for n in numbers):
+            continue                 # a fraction reported as a percentage: 0.89 -> 89%
         out.append(tok)
     return sorted(set(out))
 

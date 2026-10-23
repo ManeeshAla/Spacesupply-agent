@@ -19,7 +19,7 @@
     {"id": "r16", "category": "read", "q": "How many components are waiting for inspection?", "tools": ["list_components", "get_plant_status", "get_inventory"]},
     {"id": "r17", "category": "read", "q": "Is live mode running?", "tools": ["get_live_mode", "get_plant_status"]},
     {"id": "r18", "category": "read", "q": "What have the agents been saying to each other?", "tools": ["get_agent_messages"]},
-    {"id": "r19", "category": "read", "q": "When will the vehicle be ready for its launch-readiness review?", "tools": ["get_plant_status", "get_stage_progress"]},
+    {"id": "r19", "category": "read", "q": "When will the vehicle be ready for its launch-readiness review?", "tools": ["get_plant_status", "get_stage_progress", "get_schedule"]},
     {"id": "r20", "category": "read", "q": "Which component is blocking the most tasks right now?", "tools": ["get_shortages", "get_delayed_tasks", "get_inventory"]},
 
     {"id": "f01", "category": "follow_up", "q": "Where is CMP-021?", "tools": ["get_component"]},

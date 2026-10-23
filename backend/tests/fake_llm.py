@@ -42,6 +42,8 @@ class FakeChatModel:
                       for i, (n, a) in enumerate(turn["tools"])]
             yield AIMessageChunk(content=turn.get("text", ""), tool_call_chunks=chunks)
             return
+        if not turn["text"]:
+            return                         # a genuinely empty stream
         for word in turn["text"].split(" "):
             yield AIMessageChunk(content=word + " ")
 
