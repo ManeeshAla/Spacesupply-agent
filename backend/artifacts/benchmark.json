@@ -1,0 +1,107 @@
+{
+  "objective": "10 x priority-weighted tardiness + makespan (lower is better)",
+  "suites": {
+    "single_vehicle": {
+      "scenarios": 30,
+      "jobs_per_scenario": 23,
+      "machines": 7,
+      "algorithms": {
+        "FCFS": {
+          "makespan": 209.63,
+          "tardy_tasks": 8.17,
+          "weighted_tardiness": 901.83,
+          "total_tardiness": 192.17,
+          "utilization": 0.14,
+          "conflicts": 0,
+          "objective": 9227.97,
+          "runtime_ms": 0.22,
+          "wins_or_ties_best": 26
+        },
+        "PRIORITY": {
+          "makespan": 209.63,
+          "tardy_tasks": 8.17,
+          "weighted_tardiness": 897.43,
+          "total_tardiness": 191.17,
+          "utilization": 0.14,
+          "conflicts": 0,
+          "objective": 9183.97,
+          "runtime_ms": 0.22,
+          "wins_or_ties_best": 29
+        },
+        "GA": {
+          "makespan": 209.63,
+          "tardy_tasks": 8.17,
+          "weighted_tardiness": 897.43,
+          "total_tardiness": 191.17,
+          "utilization": 0.14,
+          "conflicts": 0,
+          "objective": 9183.97,
+          "runtime_ms": 692.83,
+          "wins_or_ties_best": 29
+        },
+        "CPSAT": {
+          "makespan": 209.63,
+          "tardy_tasks": 8.17,
+          "weighted_tardiness": 897.17,
+          "total_tardiness": 191.1,
+          "utilization": 0.14,
+          "conflicts": 0,
+          "objective": 9181.3,
+          "runtime_ms": 10.24,
+          "wins_or_ties_best": 30
+        }
+      }
+    },
+    "three_vehicle_campaign": {
+      "scenarios": 30,
+      "jobs_per_scenario": 69,
+      "machines": 7,
+      "algorithms": {
+        "FCFS": {
+          "makespan": 260.47,
+          "tardy_tasks": 19.63,
+          "weighted_tardiness": 1585.87,
+          "total_tardiness": 332.43,
+          "utilization": 0.34,
+          "conflicts": 0,
+          "objective": 16119.13,
+          "runtime_ms": 1.45,
+          "wins_or_ties_best": 1
+        },
+        "PRIORITY": {
+          "makespan": 260.73,
+          "tardy_tasks": 19.53,
+          "weighted_tardiness": 1549.1,
+          "total_tardiness": 329.7,
+          "utilization": 0.34,
+          "conflicts": 0,
+          "objective": 15751.73,
+          "runtime_ms": 1.42,
+          "wins_or_ties_best": 6
+        },
+        "GA": {
+          "makespan": 259.07,
+          "tardy_tasks": 18.3,
+          "weighted_tardiness": 1457.63,
+          "total_tardiness": 307.27,
+          "utilization": 0.34,
+          "conflicts": 0,
+          "objective": 14835.4,
+          "runtime_ms": 4493.88,
+          "wins_or_ties_best": 10
+        },
+        "CPSAT": {
+          "makespan": 258.6,
+          "tardy_tasks": 18.4,
+          "weighted_tardiness": 1409.07,
+          "total_tardiness": 297.13,
+          "utilization": 0.34,
+          "conflicts": 0,
+          "objective": 14349.27,
+          "runtime_ms": 116.89,
+          "wins_or_ties_best": 30
+        }
+      }
+    }
+  }
+}

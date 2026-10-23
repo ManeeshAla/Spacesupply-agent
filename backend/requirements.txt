@@ -1,0 +1,12 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+sqlalchemy>=2.0
+ortools>=9.10
+numpy>=1.26
+scikit-learn>=1.4
+torch>=2.2
+langgraph>=0.2
+langchain-core>=0.3
+httpx>=0.27
+pytest>=8.0
+# optional Qwen layer (needs a local Ollama server):  pip install langchain-ollama
