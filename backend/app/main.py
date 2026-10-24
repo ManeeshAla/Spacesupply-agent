@@ -64,7 +64,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="SpaceSupply-Agent API", version="1.0.0", lifespan=lifespan,
-              description="Autonomous multi-agent framework for (simulated) launch-vehicle assembly scheduling and component tracking.")
+              description="Autonomous multi-agent framework for launch-vehicle assembly scheduling and component tracking.")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 

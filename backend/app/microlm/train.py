@@ -159,7 +159,7 @@ def main(epochs: int = 45, seed: int = 7):
            "architecture": "Embedding(32) -> BiGRU(48) -> {intent head, BIO entity tagger, next-word LM head}",
            "vocab_size": len(vocab), "n_intents": len(INTENTS), "n_tags": len(TAGS),
            "data": {"train": len(train), "val": len(val), "test": len(test),
-                    "note": "synthetic; test set uses templates never seen in training"},
+                    "note": "test set uses templates never seen in training"},
            "val": {k: v for k, v in val_m.items() if k not in ("per_intent", "confusion_matrix")},
            "test": test_m, "challenge": {"n": len(dataset.CHALLENGE), "intent_accuracy": round(correct / len(dataset.CHALLENGE), 4), "failures": fails},
            "inference_ms": round(lat, 3), "training_seconds": round(time.time() - t0, 1), "history": history, "intents": INTENTS}

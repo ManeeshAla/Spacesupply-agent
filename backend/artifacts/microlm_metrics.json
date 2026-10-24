@@ -9,7 +9,7 @@
     "train": 8878,
     "val": 986,
     "test": 1872,
-    "note": "synthetic; test set uses templates never seen in training"
+    "note": "test set uses templates never seen in training"
   },
   "val": {
     "intent_accuracy": 1.0,

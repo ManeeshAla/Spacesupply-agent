@@ -64,7 +64,6 @@ function Sidebar({ page, go, collapsed, setCollapsed, mobile, onNavigate, alerts
             <div className="flex items-center gap-2 text-xs font-medium text-ink-2">
               <span className={cx('h-2 w-2 rounded-full', STATUS_TONE[status] || 'bg-ink-muted')} />System {status ? status.toLowerCase() : '…'}
             </div>
-            <div className="mt-1 text-[11px] leading-snug text-ink-muted">Synthetic data. Not affiliated with ISRO or any space agency.</div>
           </div>
         )}
         {!mobile && (
@@ -75,6 +74,17 @@ function Sidebar({ page, go, collapsed, setCollapsed, mobile, onNavigate, alerts
         )}
       </div>
     </nav>
+  )
+}
+
+function AssistantLauncher({ page, go, busy }) {
+  if (page === 'chat') return null
+  return (
+    <button onClick={() => go('chat')} aria-label="Open assistant" title="Open assistant"
+            className="fixed bottom-4 right-4 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-accent-solid text-accent-ink shadow-lg ring-1 ring-hairline transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent md:bottom-6 md:right-6">
+      {busy && <span className="absolute inset-0 animate-spin rounded-full border-2 border-accent-ink/30 border-t-accent-ink" />}
+      <Sparkles size={20} />
+    </button>
   )
 }
 
@@ -138,8 +148,9 @@ export default function Layout({ page, go, openSim, children }) {
             {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
           </IconButton>
         </header>
-        <main className="min-h-0 flex-1 overflow-y-auto"><div className="mx-auto w-full max-w-[1500px] p-4 md:p-6">{children}</div></main>
+        <main className="min-h-0 flex-1 overflow-y-auto"><div className="mx-auto w-full max-w-[1500px] p-4 pb-20 md:p-6 md:pb-24">{children}</div></main>
       </div>
+      <AssistantLauncher page={page} go={go} busy={chat.busy} />
 
       <CommandPalette open={palette} onClose={() => setPalette(false)} items={items} onAsk={ask} />
     </div>

@@ -1,7 +1,6 @@
 import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, Info, OctagonAlert, Package, Rocket, Timer } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import AgentBus from '../components/AgentBus'
-import Chat from '../components/Chat'
 import { LiveControls, LiveFeed } from '../components/Live'
 import { ChartTooltip, axisProps, gridProps } from '../chartTheme'
 import { useFetch } from '../ctx'
@@ -145,8 +144,8 @@ export default function Dashboard({ go, openComponent, openTask }) {
       </div>
 
       <div className="grid grid-cols-12 gap-4">
-        <Panel title="Component status" subtitle={`${totalUnits} units on hand or inbound`} className="col-span-12 xl:col-span-4">
-          <ul className="space-y-3">
+        <Panel title="Component status" subtitle={`${totalUnits} units on hand or inbound`} className="col-span-12">
+          <ul className="grid gap-x-8 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
             {GROUPS.map(([k, label]) => {
               const g = d.component_status[k]
               return (
@@ -160,10 +159,6 @@ export default function Dashboard({ go, openComponent, openTask }) {
               )
             })}
           </ul>
-        </Panel>
-        <Panel title="Ask the assistant" subtitle="Looks things up, explains delays and runs simulations — it asks before changing anything."
-               className="col-span-12 xl:col-span-8" height={360}>
-          <Chat compact />
         </Panel>
       </div>
     </div>

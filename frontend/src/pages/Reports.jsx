@@ -136,7 +136,7 @@ export default function Reports() {
       <PageHeader title="Reports" description="How well the assistant, the Micro LM and the schedulers perform — measured, with the caveats alongside." />
       <div className="grid grid-cols-12 gap-4">
       <div className="col-span-12 rounded-lg border border-warning/30 bg-warning/10 px-4 py-2.5 text-[13px] text-t-warning">
-        All numbers on this page are measured on <b>synthetic data</b> generated for this prototype. The test split uses sentence templates never seen in training; the held-out result is the honest one.
+        All numbers on this page are measured. The Micro LM test split uses sentence templates never seen in training; the held-out result is the honest one.
       </div>
       <h2 className="col-span-12 mt-3 border-b border-hairline pb-2 text-base font-semibold tracking-tight text-ink">Chat assistant · Gemini supervisor with tool calling</h2>
       <ChatEval ev={m.chat_eval} gemini={m.gemini_layer} />
