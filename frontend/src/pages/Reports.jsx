@@ -1,9 +1,10 @@
-import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { ChartTooltip, axisProps, gridProps } from '../chartTheme'
 import { useFetch } from '../ctx'
-import { Badge, Panel, Spinner } from '../ui'
+import { Badge, PageHeader, Panel, Spinner } from '../ui'
 
-const COLORS = { FCFS: '#64748b', PRIORITY: '#3b82f6', GA: '#a78bfa', CPSAT: '#22c55e' }
-const tip = { contentStyle: { background: '#101a3d', border: '1px solid #1c2b5a', borderRadius: 8 } }
+// each algorithm keeps its own series slot everywhere, whatever its rank (colour follows the entity)
+const COLORS = { CPSAT: 'rgb(var(--series-1))', GA: 'rgb(var(--series-2))', PRIORITY: 'rgb(var(--series-3))', FCFS: 'rgb(var(--series-4))' }
 const pct = (v) => (v == null ? '–' : `${(v * 100).toFixed(1)}%`)
 
 function Suite({ name, s }) {
@@ -12,8 +13,9 @@ function Suite({ name, s }) {
   return (
     <Panel title={`${name} — ${s.scenarios} perturbed scenarios · ${s.jobs_per_scenario} tasks · ${s.machines} workstations`} className="col-span-12 xl:col-span-6">
       <div className="h-48">
-        <ResponsiveContainer><BarChart data={data}><CartesianGrid stroke="#1c2b5a" strokeDasharray="3 3" /><XAxis dataKey="name" stroke="#94a3b8" fontSize={11} /><YAxis stroke="#94a3b8" fontSize={11} /><Tooltip {...tip} />
-          <Bar isAnimationActive={false} dataKey="objective" name="Mean objective (lower = better)" fill="#3b82f6" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer>
+        <ResponsiveContainer><BarChart data={data}><CartesianGrid {...gridProps} /><XAxis dataKey="name" {...axisProps} fontSize={11} /><YAxis {...axisProps} fontSize={11} /><Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgb(var(--surface-2))' }} />
+          <Bar isAnimationActive={false} dataKey="objective" name="Mean objective (lower = better)" radius={[4, 4, 0, 0]}>
+            {data.map((d) => <Cell key={d.name} fill={COLORS[d.name]} />)}</Bar></BarChart></ResponsiveContainer>
       </div>
       <table className="mt-2 w-full"><thead><tr>{['Algorithm', 'Objective', 'Makespan h', 'Tardy tasks', 'Conflicts', 'Runtime ms', 'Best/tied'].map((h) => <th key={h} className="th">{h}</th>)}</tr></thead>
         <tbody>{algs.map(([a, v]) => (<tr key={a} className="border-t border-line/50"><td className="td"><span className="mr-2 inline-block h-2 w-2 rounded-sm" style={{ background: COLORS[a] }} />{a}</td>
@@ -71,8 +73,8 @@ function ChatEval({ ev, gemini }) {
         <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
           {cards.map(([k, v]) => (
             <div key={k} className="rounded-lg bg-space-900/60 p-3">
-              <dt className="text-[11px] uppercase tracking-wider text-slate-400">{k}</dt>
-              <dd className="mt-1 font-semibold text-white">{v}</dd>
+              <dt className="text-xs text-ink-3">{k}</dt>
+              <dd className="mt-1 font-semibold text-ink">{v}</dd>
             </div>
           ))}
         </dl>
@@ -83,7 +85,7 @@ function ChatEval({ ev, gemini }) {
           rather than blamed on the model. Run in {ev.duration_s}s, paced for the free tier.
         </p>
         {o.fallback_rate > 10 && (
-          <p className="mt-2 rounded-lg border border-warn/40 bg-warn/10 px-2.5 py-1.5 text-[11px] text-amber-200">
+          <p className="mt-2 rounded-lg border border-warn/40 bg-warn/10 px-2.5 py-1.5 text-[11px] text-t-warning">
             {o.fallback_rate}% of questions fell back to the offline Micro LM, so the end-to-end figure mostly
             reflects free-tier availability. Re-run when the quota has reset.
           </p>
@@ -93,11 +95,11 @@ function ChatEval({ ev, gemini }) {
         <div className="h-64">
           <ResponsiveContainer>
             <BarChart data={cats} layout="vertical" margin={{ left: 60 }}>
-              <CartesianGrid stroke="#1c2b5a" strokeDasharray="3 3" />
-              <XAxis type="number" domain={[0, 100]} stroke="#94a3b8" fontSize={11} />
-              <YAxis type="category" dataKey="name" interval={0} stroke="#94a3b8" fontSize={10} width={130} />
-              <Tooltip {...tip} formatter={(v, _n, p) => [`${v}%  (n=${p.payload.n})`, 'accuracy']} />
-              <Bar isAnimationActive={false} dataKey="accuracy" fill="#22d3ee" radius={[0, 4, 4, 0]} />
+              <CartesianGrid {...gridProps} />
+              <XAxis type="number" domain={[0, 100]} {...axisProps} fontSize={11} />
+              <YAxis type="category" dataKey="name" interval={0} {...axisProps} fontSize={10} width={130} />
+              <Tooltip content={<ChartTooltip unit="%" />} cursor={{ fill: 'rgb(var(--surface-2))' }} />
+              <Bar isAnimationActive={false} dataKey="accuracy" fill="rgb(var(--series-1))" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -108,7 +110,7 @@ function ChatEval({ ev, gemini }) {
             {ev.failures.map((f) => (
               <li key={f.id} className="rounded bg-space-900/60 p-2">
                 <div className="text-slate-100">“{f.question}”</div>
-                <div className="mt-1 text-red-300">{f.notes.join(' · ')}</div>
+                <div className="mt-1 text-t-critical">{f.notes.join(' · ')}</div>
               </li>
             ))}
           </ul>
@@ -130,19 +132,21 @@ export default function Reports() {
   const labels = m.intents || []
   const bench = cmp.data?.benchmark
   return (
-    <div className="grid grid-cols-12 gap-4">
-      <div className="col-span-12 rounded-xl border border-warn/30 bg-warn/10 px-4 py-2 text-xs text-amber-200">
+    <div className="space-y-5">
+      <PageHeader title="Reports" description="How well the assistant, the Micro LM and the schedulers perform — measured, with the caveats alongside." />
+      <div className="grid grid-cols-12 gap-4">
+      <div className="col-span-12 rounded-lg border border-warning/30 bg-warning/10 px-4 py-2.5 text-[13px] text-t-warning">
         All numbers on this page are measured on <b>synthetic data</b> generated for this prototype. The test split uses sentence templates never seen in training; the held-out result is the honest one.
       </div>
-      <div className="col-span-12 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">Chat assistant · Gemini supervisor with tool calling</div>
+      <h2 className="col-span-12 mt-3 border-b border-hairline pb-2 text-base font-semibold tracking-tight text-ink">Chat assistant · Gemini supervisor with tool calling</h2>
       <ChatEval ev={m.chat_eval} gemini={m.gemini_layer} />
-      <div className="col-span-12 mt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">Micro Language Model · local PyTorch model</div>
+      <h2 className="col-span-12 mt-3 border-b border-hairline pb-2 text-base font-semibold tracking-tight text-ink">Micro Language Model · local PyTorch model</h2>
       <Panel title="Micro Language Model" className="col-span-12 xl:col-span-4">
         <dl className="grid grid-cols-2 gap-3 text-sm">
           {[['Trainable parameters', (m.parameters || 0).toLocaleString()], ['Framework', m.framework], ['Vocabulary', m.vocab_size], ['Inference', `${m.inference_ms} ms/query`],
             ['Intent accuracy (held-out)', pct(t.intent_accuracy)], ['Macro F1', pct(t.f1_macro)], ['Entity F1', pct(t.entity_f1)], ['Perplexity (LM head)', t.lm_perplexity],
             ['Hand-written challenge', pct(m.challenge?.intent_accuracy)], ['Training time', `${m.training_seconds}s`]].map(([k, v]) => (
-            <div key={k} className="rounded-lg bg-space-900/60 p-3"><dt className="text-[11px] uppercase tracking-wider text-slate-400">{k}</dt><dd className="mt-1 font-semibold text-white">{v}</dd></div>))}
+            <div key={k} className="rounded-lg bg-space-900/60 p-3"><dt className="text-xs text-ink-3">{k}</dt><dd className="mt-1 font-semibold text-ink">{v}</dd></div>))}
         </dl>
         <p className="mt-3 text-xs text-slate-400">{m.architecture}</p>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -156,25 +160,25 @@ export default function Reports() {
         </p>
       </Panel>
       <Panel title="Training curve" className="col-span-12 xl:col-span-8">
-        <div className="h-64"><ResponsiveContainer><LineChart data={m.history || []}><CartesianGrid stroke="#1c2b5a" strokeDasharray="3 3" /><XAxis dataKey="epoch" stroke="#94a3b8" fontSize={11} /><YAxis stroke="#94a3b8" fontSize={11} /><Tooltip {...tip} /><Legend />
-          <Line isAnimationActive={false} dataKey="train_loss" stroke="#f59e0b" dot={false} name="Train loss" /><Line isAnimationActive={false} dataKey="val_intent_acc" stroke="#22c55e" dot={false} name="Val intent acc" /><Line isAnimationActive={false} dataKey="val_entity_f1" stroke="#3b82f6" dot={false} name="Val entity F1" /></LineChart></ResponsiveContainer></div>
+        <div className="h-64"><ResponsiveContainer><LineChart data={m.history || []}><CartesianGrid {...gridProps} /><XAxis dataKey="epoch" {...axisProps} fontSize={11} /><YAxis {...axisProps} fontSize={11} /><Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgb(var(--surface-2))' }} /><Legend wrapperStyle={{ color: 'rgb(var(--ink-3))', fontSize: 12 }} />
+          <Line isAnimationActive={false} dataKey="train_loss" stroke="rgb(var(--series-2))" dot={false} name="Train loss" /><Line isAnimationActive={false} dataKey="val_intent_acc" stroke="rgb(var(--series-1))" dot={false} name="Val intent accuracy" /><Line isAnimationActive={false} dataKey="val_entity_f1" stroke="rgb(var(--series-3))" dot={false} name="Val entity F1" /></LineChart></ResponsiveContainer></div>
       </Panel>
       <Panel title="Per-intent F1 (held-out templates)" className="col-span-12 xl:col-span-7">
-        <div className="h-72"><ResponsiveContainer><BarChart data={intents} layout="vertical" margin={{ left: 100 }}><CartesianGrid stroke="#1c2b5a" strokeDasharray="3 3" /><XAxis type="number" domain={[0, 1]} stroke="#94a3b8" fontSize={11} /><YAxis type="category" dataKey="name" interval={0} stroke="#94a3b8" fontSize={10} width={110} /><Tooltip {...tip} />
-          <Bar isAnimationActive={false} dataKey="f1" fill="#a78bfa" radius={[0, 4, 4, 0]} /></BarChart></ResponsiveContainer></div>
+        <div className="h-[26rem]"><ResponsiveContainer><BarChart data={intents} layout="vertical" margin={{ left: 8, right: 16 }} barCategoryGap={6}><CartesianGrid {...gridProps} /><XAxis type="number" domain={[0, 1]} {...axisProps} fontSize={11} /><YAxis type="category" dataKey="name" interval={0} {...axisProps} fontSize={11} width={150} /><Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgb(var(--surface-2))' }} />
+          <Bar isAnimationActive={false} dataKey="f1" fill="rgb(var(--series-1))" radius={[0, 4, 4, 0]} /></BarChart></ResponsiveContainer></div>
       </Panel>
       <Panel title="Challenge-set misses (hand-written queries)" className="col-span-12 xl:col-span-5">
-        <ul className="space-y-2 text-xs">{(m.challenge?.failures || []).map((f, i) => (<li key={i} className="rounded bg-space-900/60 p-2"><div className="text-slate-100">“{f.text}”</div><div className="mt-1 text-slate-400">expected {f.gold} · got <span className="text-red-300">{f.pred}</span></div></li>))}
+        <ul className="space-y-2 text-xs">{(m.challenge?.failures || []).map((f, i) => (<li key={i} className="rounded bg-space-900/60 p-2"><div className="text-slate-100">“{f.text}”</div><div className="mt-1 text-slate-400">expected {f.gold} · got <span className="text-t-critical">{f.pred}</span></div></li>))}
           {!(m.challenge?.failures || []).length && <li className="text-slate-400">No misses.</li>}</ul>
       </Panel>
       {cm && (
         <Panel title="Confusion matrix (rows = true, cols = predicted)" className="col-span-12">
           <div className="overflow-x-auto"><table className="text-[10px]"><thead><tr><th />{labels.map((l, i) => <th key={i} className="px-1 py-1 text-slate-400" title={l}>{i}</th>)}</tr></thead>
             <tbody>{cm.map((row, i) => { const tot = row.reduce((a, b) => a + b, 0) || 1; return (<tr key={i}><td className="pr-2 text-right text-slate-400">{i} {labels[i]}</td>
-              {row.map((v, j) => <td key={j} className="h-6 w-8 text-center" style={{ background: `rgba(59,130,246,${(v / tot) * (i === j ? 0.9 : 1.2)})`, color: v ? '#fff' : '#334' }}>{v || ''}</td>)}</tr>) })}</tbody></table></div>
+              {row.map((v, j) => <td key={j} className="h-6 w-8 text-center" style={{ background: `rgb(var(--accent) / ${Math.min(1, (v / tot) * (i === j ? 0.9 : 1.2))})`, color: v ? 'rgb(var(--ink))' : 'rgb(var(--ink-muted))' }}>{v || ''}</td>)}</tr>) })}</tbody></table></div>
         </Panel>
       )}
-      <div className="col-span-12 mt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">Scheduler comparison · objective = 10 × priority-weighted tardiness + makespan</div>
+      <h2 className="col-span-12 mt-3 border-b border-hairline pb-2 text-base font-semibold tracking-tight text-ink">Scheduler comparison · objective = 10 × priority-weighted tardiness + makespan</h2>
       {bench && Object.entries(bench.suites).map(([k, s]) => <Suite key={k} name={k === 'single_vehicle' ? 'Single vehicle' : 'Three-vehicle campaign'} s={s} />)}
       <Panel title="Live schedule — all algorithms on the current plant state" className="col-span-12 xl:col-span-6">
         <table className="w-full"><thead><tr>{['Algorithm', 'Objective', 'Makespan', 'Tardy', 'Runtime ms'].map((h) => <th key={h} className="th">{h}</th>)}</tr></thead>
@@ -183,6 +187,7 @@ export default function Reports() {
       <Panel title="Schedule version history" className="col-span-12 xl:col-span-6" bodyClass="max-h-64 overflow-y-auto">
         <ul className="space-y-2 text-xs">{(ver.data || []).map((v) => (<li key={v.id} className="flex items-center gap-2 rounded bg-space-900/60 p-2"><Badge tone={v.current ? 'green' : 'slate'}>v{v.id}</Badge><Badge tone="blue">{v.algorithm}</Badge><span className="flex-1 text-slate-300">{v.trigger}</span><span className="text-slate-500">{v.time}</span></li>))}</ul>
       </Panel>
+    </div>
     </div>
   )
 }

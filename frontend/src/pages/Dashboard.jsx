@@ -1,102 +1,171 @@
-import { AlertTriangle, ArrowRight, Info, OctagonAlert, Zap } from 'lucide-react'
-import { CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, Info, OctagonAlert, Package, Rocket, Timer } from 'lucide-react'
+import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import AgentBus from '../components/AgentBus'
 import Chat from '../components/Chat'
 import { LiveControls, LiveFeed } from '../components/Live'
-import Rocket from '../components/Rocket'
-import { useApp, useFetch } from '../ctx'
-import { Badge, Panel, STAGE_COLORS, Spinner, nice, sevTone, statusTone } from '../ui'
+import { ChartTooltip, axisProps, gridProps } from '../chartTheme'
+import { useFetch } from '../ctx'
+import { Badge, Bar, DataTable, EmptyState, PageHeader, Panel, STAGE_COLORS, Spinner, StatCard, cx, nice } from '../ui'
 
+const SEV = {
+  CRITICAL: [OctagonAlert, 'text-t-critical'], WARNING: [AlertTriangle, 'text-t-warning'], INFO: [Info, 'text-t-accent'],
+}
 const GROUPS = [
-  ['available', 'Available', '#22c55e'], ['in_inspection', 'In Inspection', '#3b82f6'], ['in_assembly', 'In Assembly', '#f59e0b'],
-  ['installed', 'Installed', '#14b8a6'], ['on_order', 'On Order', '#64748b'], ['rejected', 'Rejected', '#ef4444'], ['delayed', 'Delayed', '#a78bfa'],
+  ['available', 'Available'], ['in_inspection', 'In inspection'], ['in_assembly', 'In assembly'], ['installed', 'Installed'],
+  ['on_order', 'On order'], ['rejected', 'Rejected'], ['delayed', 'Delayed'],
 ]
-const SevIcon = ({ s }) => s === 'CRITICAL' ? <OctagonAlert size={18} className="text-bad" /> : s === 'WARNING' ? <AlertTriangle size={18} className="text-warn" /> : <Info size={18} className="text-accent-soft" />
+const GROUP_BAD = { rejected: 'rgb(var(--critical))', delayed: 'rgb(var(--warning))' }
+
+const Link = ({ onClick, children }) => (
+  <button onClick={onClick} className="inline-flex items-center gap-1 text-xs font-medium text-t-accent hover:underline">{children}<ArrowRight size={12} /></button>
+)
 
 export default function Dashboard({ go, openComponent, openTask }) {
   const { data: d, loading } = useFetch('/dashboard', 8000)
-  if (loading || !d) return <Spinner label="Loading mission data…" />
-  const total = GROUPS.reduce((a, [k]) => a + d.component_status[k].units, 0)
-  const pie = GROUPS.map(([k, label, color]) => ({ name: label, value: d.component_status[k].units, color })).filter((x) => x.value > 0)
-  const startMs = new Date(d.now_iso).getTime() - d.now_hour * 3600e3
-  const tick = (h) => new Date(startMs + h * 3600e3).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+  if (loading || !d) return <Spinner label="Loading plant data…" />
+
+  const late = d.launch.launch_readiness_late_hours
   const inv = d.inventory
-  const tiles = [['Sufficient', inv.sufficient, '#22c55e', 'lots'], ['Low stock', inv.low, '#f59e0b', 'lots'], ['Critical', inv.critical, '#ef4444', 'lots'], ['On order', inv.on_order, '#3b82f6', 'lots']]
+  const critical = d.alerts.filter((a) => a.severity === 'CRITICAL').length
+  const totalUnits = GROUPS.reduce((a, [k]) => a + d.component_status[k].units, 0) || 1
+  const startMs = new Date(d.now_iso).getTime() - d.now_hour * 3600e3
+  const day = (h) => new Date(startMs + h * 3600e3).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+  const pts = d.progress.points
 
   return (
-    <div className="grid grid-cols-12 gap-4">
-      <Panel title="Launch vehicle overview" className="col-span-12 h-[330px] xl:col-span-8"
-             right={<span className="text-xs text-slate-400">Projected launch-readiness review: <b className={d.launch.launch_readiness_late_hours ? 'text-amber-300' : 'text-green-300'}>{d.launch.launch_readiness}</b></span>}>
-        <Rocket stages={d.stages} />
-      </Panel>
-      <Panel title="Space Supply Agent (LLM)" className="col-span-12 h-[330px] xl:col-span-4"><Chat compact /></Panel>
+    <div className="space-y-5">
+      <PageHeader title="Plant overview" description="Live status of the launch-vehicle assembly line: schedule health, supply, and what the agents are doing about it." />
 
-      <Panel title="Component status" className="col-span-12 md:col-span-6 xl:col-span-4 h-[300px]">
-        <div className="flex h-full items-center gap-2">
-          <div className="relative h-full w-1/2">
-            <ResponsiveContainer><PieChart><Pie data={pie} dataKey="value" innerRadius="62%" outerRadius="92%" stroke="#0b1330" strokeWidth={2}>
-              {pie.map((e) => <Cell key={e.name} fill={e.color} />)}</Pie><Tooltip contentStyle={{ background: '#101a3d', border: '1px solid #1c2b5a', borderRadius: 8 }} /></PieChart></ResponsiveContainer>
-            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center"><div className="text-2xl font-bold text-white">{total}</div><div className="text-xs text-slate-400">units</div></div>
+      {/* headline */}
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <StatCard label="Launch readiness review" icon={Rocket} value={d.launch.launch_readiness}
+                  tone={late ? 'bad' : 'good'} sub={late ? `${late} h behind its deadline` : 'On schedule'} onClick={() => go('schedule')} />
+        <StatCard label="Open alerts" icon={AlertTriangle} value={d.kpis.pending_alerts} tone={critical ? 'bad' : d.kpis.pending_alerts ? 'warn' : 'good'}
+                  sub={critical ? `${critical} critical` : d.kpis.pending_alerts ? 'None critical' : 'All clear'} onClick={() => go('alerts')} />
+        <StatCard label="Tasks running" icon={Timer} value={d.kpis.ongoing_tasks} sub={`${d.kpis.planned_next_24h} planned to start in the next 24 h`} onClick={() => go('schedule')} />
+        <StatCard label="Component units" icon={Package} value={d.kpis.component_units}
+                  sub={`${d.kpis.component_lots} lots · ${inv.critical} critical, ${inv.low} low`} onClick={() => go('inventory')} />
+      </div>
+
+      {/* progress + needs attention */}
+      <div className="grid grid-cols-12 gap-4">
+        <Panel title="Assembly progress" subtitle="Share of each stage's work complete — solid to now, projected after" className="col-span-12 xl:col-span-8">
+          <div className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
+            {d.stages.map((s) => (
+              <div key={s.id}>
+                <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                  <span className="truncate text-[13px] font-medium text-ink">{s.name.replace(/ – /, ' · ').replace(/ — /, ' · ')}</span>
+                  <span className="tabular text-[13px] font-semibold text-ink">{Math.round(s.progress)}%</span>
+                </div>
+                <Bar value={s.progress} color={STAGE_COLORS[s.id]} />
+                <div className="mt-1 text-xs text-ink-3">{s.status} · {s.tasks_done}/{s.tasks_total} tasks{s.tasks_active ? ` · ${s.tasks_active} running` : ''}</div>
+              </div>
+            ))}
           </div>
-          <ul className="w-1/2 space-y-1.5 text-xs">{GROUPS.map(([k, label, color]) => (
-            <li key={k} className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: color }} /><span className="flex-1 text-slate-300">{label}</span>
-              <span className="text-slate-100">{d.component_status[k].units}</span><span className="w-9 text-right text-slate-500">{Math.round((100 * d.component_status[k].units) / total)}%</span></li>))}</ul>
-        </div>
-      </Panel>
+          <div className="mt-5 h-64">
+            <ResponsiveContainer>
+              <LineChart data={pts} margin={{ top: 8, right: 12, bottom: 0, left: -18 }}>
+                <CartesianGrid {...gridProps} />
+                <XAxis dataKey="hour" {...axisProps} interval={3} tickFormatter={day} />
+                <YAxis {...axisProps} domain={[0, 100]} ticks={[0, 50, 100]} tickFormatter={(v) => `${v}%`} />
+                <Tooltip content={<ChartTooltip unit="%" title={(h) => day(h)} />} cursor={{ stroke: 'rgb(var(--chart-axis))' }} />
+                <ReferenceLine x={d.progress.now} stroke="rgb(var(--ink-muted))" strokeDasharray="3 3"
+                               label={{ value: 'now', position: 'insideTopLeft', fill: 'rgb(var(--ink-muted))', fontSize: 11 }} />
+                {d.stages.map((s) => (
+                  <Line key={s.id} type="monotone" dataKey={`s${s.id}`} name={`Stage ${s.id}`} stroke={STAGE_COLORS[s.id]} strokeWidth={2}
+                        dot={false} activeDot={{ r: 4, stroke: 'rgb(var(--surface-1))', strokeWidth: 2 }} isAnimationActive={false} />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-ink-3">
+            {d.stages.map((s) => (
+              <span key={s.id} className="inline-flex items-center gap-1.5">
+                <span className="w-4 rounded" style={{ background: STAGE_COLORS[s.id], height: 3 }} />{s.short_name}
+              </span>
+            ))}
+          </div>
+        </Panel>
 
-      <Panel title="Inventory status" className="col-span-12 md:col-span-6 xl:col-span-4 h-[300px]">
-        <div className="grid h-full grid-cols-2 gap-3">{tiles.map(([label, v, c, unit]) => (
-          <button key={label} onClick={() => go('inventory')} className="rounded-xl border border-line bg-space-900/60 p-4 text-left transition hover:border-accent">
-            <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: c }}>{label}</div>
-            <div className="mt-2 text-3xl font-bold text-white">{v}</div><div className="text-xs text-slate-500">{unit}</div></button>))}</div>
-      </Panel>
+        <Panel title="Needs attention" right={<Link onClick={() => go('alerts')}>All alerts</Link>} className="col-span-12 xl:col-span-4" flush>
+          {d.alerts.length === 0 ? <EmptyState icon={CheckCircle2} title="Nothing needs attention" body="No open alerts right now." /> : (
+            <ul className="divide-y divide-hairline">
+              {d.alerts.slice(0, 4).map((a) => {
+                const [Icon, color] = SEV[a.severity] || SEV.INFO
+                return (
+                  <li key={a.id}>
+                    <button onClick={() => go('alerts')} className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-2">
+                      <Icon size={17} className={cx('mt-0.5 shrink-0', color)} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[13px] font-medium leading-snug text-ink">{a.title}</span>
+                        <span className="mt-0.5 line-clamp-2 block text-xs text-ink-3">{a.message}</span>
+                      </span>
+                      <span className="shrink-0 text-[11px] tabular text-ink-muted">{a.time}</span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </Panel>
+      </div>
 
-      <Panel title="Today's schedule" className="col-span-12 xl:col-span-4 h-[300px]" right={<button className="text-xs text-accent-soft hover:underline" onClick={() => go('schedule')}>Open Gantt <ArrowRight size={11} className="inline" /></button>}>
-        <div className="h-full overflow-y-auto"><table className="w-full"><thead><tr><th className="th">Task</th><th className="th">Name</th><th className="th">WS</th><th className="th">Start</th><th className="th">Status</th></tr></thead>
-          <tbody>{d.todays_schedule.map((t) => (
-            <tr key={t.id} onClick={() => openTask(t.id)} className="cursor-pointer border-t border-line/50 hover:bg-space-700/60">
-              <td className="td !px-2 !py-1.5 text-xs">{t.id}</td><td className="td !px-2 !py-1.5 text-xs">{t.name}</td><td className="td !px-2 !py-1.5 text-xs">{t.workstation}</td>
-              <td className="td !px-2 !py-1.5 text-xs">{t.time}</td><td className="td !px-2 !py-1.5 text-xs"><Badge tone={t.status === 'In Progress' ? 'cyan' : 'amber'}>{t.status}</Badge></td></tr>))}</tbody></table></div>
-      </Panel>
+      {/* the two live feeds, side by side */}
+      <div className="grid grid-cols-12 gap-4">
+        <Panel title="Live activity" subtitle="What the plant is doing right now" className="col-span-12 xl:col-span-8" right={<LiveControls compact />} height={330}>
+          <LiveFeed />
+        </Panel>
+        <AgentBus className="col-span-12 xl:col-span-4" max={14} title="Agent communication" height={330} bodyClass="overflow-y-auto" />
+      </div>
 
-      <Panel title="Alerts" className="col-span-12 md:col-span-6 xl:col-span-4 h-[300px]" right={<button className="text-xs text-accent-soft hover:underline" onClick={() => go('alerts')}>View all <ArrowRight size={11} className="inline" /></button>}>
-        <ul className="h-full space-y-2 overflow-y-auto">{d.alerts.length === 0 && <li className="text-sm text-slate-400">No open alerts. All systems nominal.</li>}
-          {d.alerts.map((a) => (
-            <li key={a.id} className="flex gap-3 rounded-lg border border-line/70 bg-space-900/50 p-2.5"><SevIcon s={a.severity} />
-              <div className="min-w-0 flex-1"><div className={`text-[11px] font-semibold uppercase ${a.severity === 'CRITICAL' ? 'text-red-300' : a.severity === 'WARNING' ? 'text-amber-300' : 'text-blue-300'}`}>{a.severity}</div>
-                <div className="truncate text-sm text-slate-100" title={a.title}>{a.title}</div></div><div className="text-[11px] text-slate-500">{a.time.slice(7)}</div></li>))}</ul>
-      </Panel>
+      {/* schedule, deliveries, components */}
+      <div className="grid grid-cols-12 gap-4">
+        <Panel title="Today's schedule" right={<Link onClick={() => go('schedule')}>Full schedule</Link>} className="col-span-12 xl:col-span-6" flush>
+          <DataTable dense onRowClick={(r) => openTask(r.id)} rowKey={(r) => r.id}
+                     empty={<EmptyState icon={CalendarClock} title="Nothing scheduled" body="No task is running or starting in the next 24 hours." />}
+                     columns={[
+                       { key: 'id', label: 'Task', className: 'whitespace-nowrap', render: (r) => <span className="mono text-xs text-ink-3">{r.id}</span> },
+                       { key: 'name', label: 'Name', render: (r) => <span className="text-ink">{r.name}</span> },
+                       { key: 'workstation', label: 'Machine', render: (r) => <span className="mono text-xs">{r.workstation}</span> },
+                       { key: 'time', label: 'Starts', className: 'whitespace-nowrap' },
+                       { key: 'status', label: '', render: (r) => <Badge tone={r.status === 'In Progress' ? 'cyan' : 'slate'} dot>{r.status}</Badge> },
+                     ]} rows={d.todays_schedule} />
+        </Panel>
 
-      <Panel title="Assembly progress" className="col-span-12 md:col-span-6 xl:col-span-4 h-[300px]" right={<span className="text-[11px] text-slate-500">actual · projected after NOW</span>}>
-        <ResponsiveContainer>
-          <LineChart data={d.progress.points} margin={{ top: 6, right: 8, left: -18, bottom: 0 }}>
-            <CartesianGrid stroke="#1c2b5a" strokeDasharray="3 3" />
-            <XAxis dataKey="hour" type="number" domain={['dataMin', 'dataMax']} tickFormatter={tick} tick={{ fill: '#94a3b8', fontSize: 10 }} tickCount={7} />
-            <YAxis domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 10 }} />
-            <Tooltip labelFormatter={(h) => tick(h)} contentStyle={{ background: '#101a3d', border: '1px solid #1c2b5a', borderRadius: 8, fontSize: 12 }} />
-            <ReferenceLine x={d.progress.now} stroke="#22d3ee" strokeDasharray="4 3" label={{ value: 'NOW', fill: '#22d3ee', fontSize: 10, position: 'top' }} />
-            {[1, 2, 3, 4].map((i) => <Line key={i} type="monotone" dataKey={`s${i}`} name={`Stage ${i}`} stroke={STAGE_COLORS[i]} strokeWidth={2} dot={false} />)}
-            <Legend iconType="plainline" wrapperStyle={{ fontSize: 11 }} />
-          </LineChart>
-        </ResponsiveContainer>
-      </Panel>
+        <Panel title="Upcoming deliveries" right={<Link onClick={() => go('inventory')}>Inventory</Link>} className="col-span-12 xl:col-span-6" flush>
+          <DataTable dense onRowClick={(r) => openComponent(r.component_id)} rowKey={(r) => r.id}
+                     empty={<EmptyState icon={CheckCircle2} title="All deliveries received" />}
+                     columns={[
+                       { key: 'component', label: 'Component', render: (r) => <><div className="text-ink">{r.component}</div><div className="mono text-[11px] text-ink-muted">{r.component_id}</div></> },
+                       { key: 'eta', label: 'ETA', className: 'whitespace-nowrap', render: (r) => <>{r.eta}{r.delay_hours > 0 && <Badge tone="red" className="ml-1.5">+{r.delay_hours}h</Badge>}</> },
+                       { key: 'supplier', label: 'Supplier', className: 'text-ink-3', render: (r) => r.supplier.split(' ').slice(0, 2).join(' ') },
+                     ]} rows={d.deliveries.slice(0, 6)} />
+        </Panel>
 
-      {/* the two live feeds sit side by side: what the plant is doing, and what the agents
-          are saying to each other about it */}
-      <Panel title="Live activity" className="col-span-12 h-[320px] xl:col-span-8" right={<LiveControls compact />}>
-        <LiveFeed />
-      </Panel>
+      </div>
 
-      <AgentBus className="col-span-12 h-[320px] xl:col-span-4" max={14} bodyClass="overflow-y-auto" />
-
-      <Panel title="Upcoming deliveries" className="col-span-12 h-[320px] xl:col-span-8" right={<button className="text-xs text-accent-soft hover:underline" onClick={() => go('inventory')}>View all <ArrowRight size={11} className="inline" /></button>}>
-        <div className="h-full overflow-y-auto"><table className="w-full"><thead><tr><th className="th">ID</th><th className="th">Component</th><th className="th">ETA</th><th className="th">Supplier</th></tr></thead>
-          <tbody>{d.deliveries.length === 0 && <tr><td colSpan={4} className="td text-sm text-slate-400">All deliveries received.</td></tr>}{d.deliveries.map((x) => (
-            <tr key={x.id} onClick={() => openComponent(x.component_id)} className="cursor-pointer border-t border-line/50 hover:bg-space-700/60">
-              <td className="td !px-2 !py-1.5 text-xs">{x.component_id}</td><td className="td !px-2 !py-1.5 text-xs">{x.component}</td>
-              <td className="td !px-2 !py-1.5 text-xs">{x.eta}{x.delay_hours > 0 && <Badge tone="red" className="ml-1">+{x.delay_hours}h</Badge>}</td>
-              <td className="td !px-2 !py-1.5 text-xs text-slate-400">{x.supplier.split(' ').slice(0, 2).join(' ')}</td></tr>))}</tbody></table></div>
-      </Panel>
+      <div className="grid grid-cols-12 gap-4">
+        <Panel title="Component status" subtitle={`${totalUnits} units on hand or inbound`} className="col-span-12 xl:col-span-4">
+          <ul className="space-y-3">
+            {GROUPS.map(([k, label]) => {
+              const g = d.component_status[k]
+              return (
+                <li key={k}>
+                  <div className="mb-1 flex items-baseline justify-between text-[13px]">
+                    <span className="text-ink-2">{label}</span>
+                    <span className="tabular text-ink">{g.units}<span className="ml-1 text-xs text-ink-muted">· {g.lots} lots</span></span>
+                  </div>
+                  <Bar value={(g.units / totalUnits) * 100} color={GROUP_BAD[k] || 'rgb(var(--accent))'} height={5} />
+                </li>
+              )
+            })}
+          </ul>
+        </Panel>
+        <Panel title="Ask the assistant" subtitle="Looks things up, explains delays and runs simulations — it asks before changing anything."
+               className="col-span-12 xl:col-span-8" height={360}>
+          <Chat compact />
+        </Panel>
+      </div>
     </div>
   )
 }

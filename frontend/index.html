@@ -1,11 +1,21 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SpaceSupply-Agent</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <meta name="description" content="SpaceSupply — autonomous multi-agent control for launch-vehicle assembly scheduling and component tracking (synthetic data)." />
+    <meta name="theme-color" content="#0d0d0d" />
+    <title>SpaceSupply</title>
+    <!-- set the theme before first paint so there is no flash -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('spacesupply-theme');
+          if (!t) t = 'dark'; // control-room default; the toggle can switch to light
+          document.documentElement.setAttribute('data-theme', t);
+        } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

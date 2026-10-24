@@ -74,6 +74,23 @@ objects, not a distributed broker.
 * **Autonomy**: events trigger re-planning (warm-started CP-SAT), a monitoring scan and alerts; a background supervisor runs every 15 s. Schedules are versioned.
 * **Qwen layer (optional)**: if [Ollama](https://ollama.com) is running with `qwen2.5:3b-instruct`, the Micro LM's fallback answers are re-worded by Qwen; a guard rejects any rewrite that changes an ID or number. Without Ollama everything still works (deterministic wording).
 
+## The interface
+A neutral, high-contrast dark theme with a full light theme (toggle in the top bar; remembered per browser). The look is built from design tokens in `frontend/src/index.css` — surfaces, ink, one accent, reserved status colours — so a theme is a handful of CSS variables, and nothing in the markup hard-codes a colour.
+
+* **Navigation:** grouped sidebar (Operate / Supply / Intelligence), collapsible, with a menu drawer on phones. Every page has a URL (`#/schedule`, `#/alerts` …), so deep links and the Back button work.
+* **⌘K / Ctrl+K command palette:** jump to a page, play/pause live mode, open the scenario panel, switch theme — or type any question and send it to the assistant.
+* **Dashboard:** headline figures, assembly progress, what needs attention, then the **Live activity** feed beside the **Agent communication** feed so you can watch the plant and the agents react together.
+* **Type:** Inter and JetBrains Mono, self-hosted (works offline in a demo); tabular numerals for every figure.
+* **Colour that means something:** the four vehicle stages use a single-hue ordinal ramp (so "Stage 1 → 4" reads as a sequence and never collides with status colours); the scheduler comparison uses a fixed categorical order. Both were checked with the dataviz palette validator for colour-blind separation.
+
+Two checks keep this honest, and both are cheap to re-run:
+
+```bash
+cd frontend && node scripts/check-contrast.mjs        # WCAG AA for every text/background pair, both themes
+cd backend  && python scripts/e2e_live_check.py       # drives the real UI: Play, 30 s, disruption + re-plan, Pause
+```
+The second needs `pip install playwright` and a built UI (`npm run build`); it uses your installed Chrome and starts its own throwaway server, so it never touches your real plant. `LIVE_SEED` makes its random disruption reproducible.
+
 ## Run
 ```bash
 ./run.sh                      # creates venv, installs, builds the UI, serves everything on :8000

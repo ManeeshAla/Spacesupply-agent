@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Search } from 'lucide-react'
 import { useApp, useFetch } from '../ctx'
-import { Badge, Panel, Spinner, nice, statusTone } from '../ui'
+import { Badge, DataTable, PageHeader, Panel, SearchInput, Select, Spinner, StatusDot, nice, statusTone } from '../ui'
 
 const GROUPS = ['all', 'available', 'in_inspection', 'in_assembly', 'installed', 'on_order', 'rejected']
+const CRIT = { CRITICAL: 'red', HIGH: 'amber' }
 
 export default function Components({ openComponent }) {
   const { filters } = useApp()
@@ -11,28 +11,37 @@ export default function Components({ openComponent }) {
   const [q, setQ] = useState('')
   const [g, setG] = useState('all')
   const [stage, setStage] = useState(0)
-  // the chat can set these filters for us ("show me rejected parts in stage 2")
+  // the assistant can set these filters ("show me rejected parts in stage 2")
   useEffect(() => { if (filters.query != null) setQ(filters.query) }, [filters.query])
   useEffect(() => { if (filters.stage != null) setStage(Number(filters.stage) || 0) }, [filters.stage])
   if (loading || !data) return <Spinner />
+
   const rows = data.filter((c) => (g === 'all' || c.group === g) && (!stage || c.stage_id === stage) &&
     (!q || (c.id + c.name + c.location + c.supplier).toLowerCase().includes(q.toLowerCase())))
+
   return (
-    <Panel title={`Components (${rows.length} of ${data.length} lots)`}
-           right={<div className="flex flex-wrap items-center gap-2">
-             <div className="relative"><Search size={14} className="absolute left-2.5 top-2.5 text-slate-500" /><input className="input !pl-8" placeholder="Search id, name, location…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
-             <select className="input" value={g} onChange={(e) => setG(e.target.value)}>{GROUPS.map((x) => <option key={x} value={x}>{nice(x)}</option>)}</select>
-             <select className="input" value={stage} onChange={(e) => setStage(+e.target.value)}><option value={0}>All stages</option>{[1, 2, 3, 4].map((s) => <option key={s} value={s}>Stage {s}</option>)}</select></div>}>
-      <div className="overflow-auto rounded-lg border border-line" style={{ maxHeight: 'calc(100vh - 300px)' }}>
-        <table className="w-full"><thead className="sticky top-0 bg-space-700"><tr>{['ID', 'Name', 'Category', 'Stage', 'Status', 'Location', 'On hand / Req.', 'Inspection', 'Criticality', 'Usable in'].map((h) => <th key={h} className="th">{h}</th>)}</tr></thead>
-          <tbody>{rows.map((c) => (
-            <tr key={c.id} onClick={() => openComponent(c.id)} className="cursor-pointer border-t border-line/50 hover:bg-space-700/60">
-              <td className="td font-mono text-xs">{c.id}</td><td className="td">{c.name}</td><td className="td text-slate-400">{nice(c.category)}</td><td className="td">S{c.stage_id}</td>
-              <td className="td"><Badge tone={statusTone(c.status)}>{nice(c.status)}</Badge>{c.delay_hours > 0 && <Badge tone="red" className="ml-1">delayed {c.delay_hours}h</Badge>}</td>
-              <td className="td text-slate-300">{c.location}</td><td className="td">{c.quantity} / {c.required}</td><td className="td text-slate-400">{nice(c.inspection_status)}</td>
-              <td className="td"><Badge tone={c.criticality === 'CRITICAL' ? 'red' : c.criticality === 'HIGH' ? 'amber' : 'slate'}>{c.criticality}</Badge></td>
-              <td className="td">{c.ready_in_hours ? `${c.ready_in_hours}h` : '—'}</td></tr>))}</tbody></table>
-      </div>
-    </Panel>
+    <div className="space-y-5">
+      <PageHeader title="Components" description={`${data.length} component lots across the four stages. Click a row for its full lifecycle history.`} />
+      <Panel flush title={`${rows.length} of ${data.length} lots`}
+             right={<>
+               <SearchInput className="w-56" placeholder="Search id, name, location…" value={q} onChange={setQ} />
+               <Select label="Lifecycle group" value={g} onChange={setG} options={GROUPS.map((x) => ({ value: x, label: x === 'all' ? 'All statuses' : nice(x) }))} />
+               <Select label="Stage" value={String(stage)} onChange={(v) => setStage(+v)}
+                       options={[{ value: '0', label: 'All stages' }, ...[1, 2, 3, 4].map((s) => ({ value: String(s), label: `Stage ${s}` }))]} />
+             </>}>
+        <DataTable rows={rows} rowKey={(c) => c.id} onRowClick={(c) => openComponent(c.id)} maxHeight="calc(100dvh - 15rem)"
+                   columns={[
+                     { key: 'id', label: 'ID', render: (c) => <span className="mono text-xs text-ink-3">{c.id}</span> },
+                     { key: 'name', label: 'Name', render: (c) => <span className="text-ink">{c.name}</span> },
+                     { key: 'stage', label: 'Stage', render: (c) => `S${c.stage_id}` },
+                     { key: 'status', label: 'Status', render: (c) => <span className="inline-flex items-center gap-1.5"><StatusDot tone={statusTone(c.status)}>{nice(c.status)}</StatusDot>{c.delay_hours > 0 && <Badge tone="red">+{c.delay_hours}h</Badge>}</span> },
+                     { key: 'location', label: 'Location', className: 'text-ink-3' },
+                     { key: 'qty', label: 'On hand / req.', align: 'right', render: (c) => <span className="tabular">{c.quantity} / {c.required}</span> },
+                     { key: 'insp', label: 'Inspection', className: 'text-ink-3', render: (c) => nice(c.inspection_status) },
+                     { key: 'crit', label: 'Criticality', render: (c) => (CRIT[c.criticality] ? <Badge tone={CRIT[c.criticality]}>{nice(c.criticality)}</Badge> : <span className="text-ink-muted">{nice(c.criticality)}</span>) },
+                     { key: 'ready', label: 'Usable in', align: 'right', render: (c) => <span className="tabular">{c.ready_in_hours ? `${c.ready_in_hours} h` : '—'}</span> },
+                   ]} />
+      </Panel>
+    </div>
   )
 }
