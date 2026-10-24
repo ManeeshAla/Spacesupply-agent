@@ -14,11 +14,11 @@ export function ComponentDrawer({ id, onClose, onTask }) {
             <Badge tone={data.criticality === 'CRITICAL' ? 'red' : data.criticality === 'HIGH' ? 'amber' : 'slate'}>{data.criticality}</Badge>
             {data.delay_hours > 0 && <Badge tone="red">delayed {data.delay_hours}h</Badge>}
           </div>
-          <dl className="grid grid-cols-2 gap-3 text-sm">
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-4 border-y border-hairline py-4">
             {[['Location', data.location], ['Stage', `Stage ${data.stage_id}`], ['On hand', data.quantity], ['Required', data.required],
               ['Inspection', nice(data.inspection_status)], ['Supplier', data.supplier],
               ['Usable in', data.ready_in_hours ? `${data.ready_in_hours}h` : 'now']].map(([k, v]) => (
-              <div key={k} className="rounded-lg border border-line bg-space-900/60 p-2.5"><dt className="text-[11px] uppercase tracking-wider text-slate-400">{k}</dt><dd className="mt-0.5 text-slate-100">{v}</dd></div>
+              <div key={k}><dt className="text-xs text-ink-3">{k}</dt><dd className="mt-0.5 text-[13px] text-ink">{v}</dd></div>
             ))}
           </dl>
           {data.delivery && <div className="rounded-lg border border-warn/30 bg-warn/10 p-3 text-sm">Delivery <b>{data.delivery.id}</b> · {data.delivery.quantity} unit(s) · ETA in {data.delivery.eta_in}h · {nice(data.delivery.status)}{data.delivery.delay_hours ? ` · delayed ${data.delivery.delay_hours}h` : ''}</div>}
@@ -33,7 +33,7 @@ export function ComponentDrawer({ id, onClose, onTask }) {
             <ol className="relative space-y-3 border-l border-line pl-5">
               {data.history.slice().reverse().map((e, i) => (
                 <li key={i} className="relative">
-                  <span className="absolute -left-[25px] top-1 h-2.5 w-2.5 rounded-full bg-accent ring-4 ring-space-800" />
+                  <span className="absolute -left-[25px] top-1 h-2.5 w-2.5 rounded-full bg-accent ring-4 ring-surface-1" />
                   <div className="text-sm font-medium text-slate-100">{nice(e.event)}</div>
                   <div className="text-xs text-slate-400">{e.time}{e.location ? ` · ${e.location}` : ''}</div>
                   {e.note && <div className="text-xs text-slate-300">{e.note}</div>}

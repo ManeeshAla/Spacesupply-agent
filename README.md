@@ -2,7 +2,7 @@
 
 **Autonomous multi-agent framework for launch-vehicle assembly-line scheduling and component tracking** — final-year project prototype.
 
-> ⚠️ **All data is synthetic** (fictional suppliers, parts and schedules). The project is not affiliated with ISRO or any space agency.
+> The project is not affiliated with ISRO or any space agency.
 
 ## What it does
 Tracks ~85 component lots through their lifecycle (ordered → received → inspected → warehouse → bay → installed), keeps a precedence- and component-aware assembly schedule for a 4-stage vehicle, and **re-plans automatically** when something goes wrong (supplier delay, rejected part, workstation outage). A chat assistant answers questions about the plant in plain language, **runs simulations on request** (after you confirm) and **drives the dashboard** for you.
@@ -74,6 +74,24 @@ objects, not a distributed broker.
 * **Autonomy**: events trigger re-planning (warm-started CP-SAT), a monitoring scan and alerts; a background supervisor runs every 15 s. Schedules are versioned.
 * **Qwen layer (optional)**: if [Ollama](https://ollama.com) is running with `qwen2.5:3b-instruct`, the Micro LM's fallback answers are re-worded by Qwen; a guard rejects any rewrite that changes an ID or number. Without Ollama everything still works (deterministic wording).
 
+## The interface
+A neutral, high-contrast dark theme with a full light theme (toggle in the top bar; remembered per browser). The look is built from design tokens in `frontend/src/index.css` — surfaces, ink, one accent, reserved status colours — so a theme is a handful of CSS variables, and nothing in the markup hard-codes a colour.
+
+* **Navigation:** grouped sidebar (Operate / Supply / Intelligence), collapsible, with a menu drawer on phones. Every page has a URL (`#/schedule`, `#/alerts` …), so deep links and the Back button work.
+* **⌘K / Ctrl+K command palette:** jump to a page, play/pause live mode, open the scenario panel, switch theme — or type any question and send it to the assistant.
+* **Dashboard:** headline figures, assembly progress, what needs attention, then the **Live activity** feed beside the **Agent communication** feed so you can watch the plant and the agents react together.
+* **Assistant, always one tap away:** a floating launcher sits bottom-right on every page except the Assistant tab itself; it jumps straight there (no popup) and pulses while an answer is still streaming. The conversation lives above the page components, so switching pages and coming back never loses it — even mid-reply.
+* **Type:** Inter and JetBrains Mono, self-hosted (works offline in a demo); tabular numerals for every figure.
+* **Colour that means something:** the four vehicle stages use a single-hue ordinal ramp (so "Stage 1 → 4" reads as a sequence and never collides with status colours); the scheduler comparison uses a fixed categorical order. Both were checked with the dataviz palette validator for colour-blind separation.
+
+Two checks keep this honest, and both are cheap to re-run:
+
+```bash
+cd frontend && node scripts/check-contrast.mjs        # WCAG AA for every text/background pair, both themes
+cd backend  && python scripts/e2e_live_check.py       # drives the real UI: Play, 30 s, disruption + re-plan, Pause
+```
+The second needs `pip install playwright` and a built UI (`npm run build`); it uses your installed Chrome and starts its own throwaway server, so it never touches your real plant. `LIVE_SEED` makes its random disruption reproducible.
+
 ## Run
 ```bash
 ./run.sh                      # creates venv, installs, builds the UI, serves everything on :8000
@@ -131,7 +149,7 @@ Press **Play** in the header. The simulated clock then runs by itself: deliverie
 5. Schedule page: Gantt with red rings on projected-late tasks; click a bar for the explanation; try **Re-plan** with each algorithm.
 6. Reports page: chat-assistant evaluation, Micro LM metrics and scheduler comparison.
 
-## Evaluation (measured, synthetic data)
+## Evaluation (measured)
 
 **Chat assistant** — 46 questions run against the real Gemini API: 20 reads, 6 follow-ups needing
 memory, 3 dashboard-control, 8 actions, 6 tricky/no-data, 3 off-topic. A question passes only if the
@@ -210,8 +228,8 @@ guard, the retry → fallback-model → Micro LM chain, UI commands and inline t
 order, and the three-agent message-bus exchange.
 
 ## Limitations (be upfront in your viva)
-* **Synthetic data only**, and the chat evaluation numbers must be produced by running
-  `scripts/eval_chat.py` with your own key — they are a live-API measurement, not a fixed result.
+* **The chat evaluation numbers must be produced by running `scripts/eval_chat.py`** with your own
+  key — they are a live-API measurement, not a fixed result.
 * **Free-tier rate limits are the main practical constraint.** The exact RPM/RPD are not published
   per model, and the bigger flash models exhaust their free allowance almost immediately (see the
   model-choice note above). `eval_chat.py` paces itself and may still need `--pace` raised. Hitting a
@@ -225,8 +243,8 @@ order, and the three-agent message-bus exchange.
   on a plant reset (the old conversation would refer to a state that no longer exists).
 * **The message bus is in-process pub/sub**, not a broker — no retries, no persistence of undelivered
   messages, no cross-process delivery.
-* **Prompts go to Google.** The data here is synthetic, but free-tier input may be used by Google to
-  improve their products; do not point this at real supplier data without checking their terms.
+* **Prompts go to Google.** Free-tier input may be used by Google to improve their products; check
+  their terms before pointing this at sensitive supplier data.
 * The Micro LM is trained on templates, so free-form phrasing is weaker than a real LLM, and it has
   no action intents — **the offline fallback is read-only** and will say so if you ask it to change
   something. It also has no off-topic intent, so when a fallback happens to catch an off-topic

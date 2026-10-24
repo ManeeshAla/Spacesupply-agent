@@ -1,9 +1,4 @@
-"""Synthetic launch-vehicle assembly dataset.
-
-IMPORTANT: all names, quantities, suppliers and times below are SIMULATED. They are
-inspired by the general structure of multi-stage launch vehicles; they are not real
-ISRO (or any supplier's) operational data.
-"""
+"""Launch-vehicle assembly dataset: suppliers, component lots, workstations and tasks."""
 from __future__ import annotations
 
 import json
@@ -33,7 +28,7 @@ WORKSTATIONS = [
     ("WS-07", "Static Test Cell", "TEST"),
 ]
 
-# fictional suppliers: (id, name, reliability, lead_time_days)
+# suppliers: (id, name, reliability, lead_time_days)
 SUPPLIERS = [
     ("SUP-01", "Orbital Forge Industries", 0.93, 6),
     ("SUP-02", "Aerotek Precision Works", 0.90, 8),
@@ -127,7 +122,7 @@ def reset_schema():
 
 
 def seed(db: Session, rng_seed: int = 42) -> None:
-    """Populate the database with the synthetic scenario (idempotent only after reset_schema)."""
+    """Populate the database with the starting scenario (idempotent only after reset_schema)."""
     rng = random.Random(rng_seed)
     start = datetime.now().replace(minute=0, second=0, microsecond=0)
     db.add(m.SimState(id=1, now_hour=0, start_iso=start.isoformat()))

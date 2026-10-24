@@ -1,4 +1,4 @@
-"""Synthetic training data for the Micro LM: (query, intent, entity BIO tags)."""
+"""Template-generated training data for the Micro LM: (query, intent, entity BIO tags)."""
 from __future__ import annotations
 
 import random

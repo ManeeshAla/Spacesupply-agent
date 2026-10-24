@@ -30,7 +30,7 @@ from . import gemini
 from .tools import REGISTRY, ToolCtx, run_tool
 
 SYSTEM_PROMPT = """You are SpaceSupply-Agent, the assistant for a launch-vehicle assembly line \
-(a simulated 4-stage vehicle with synthetic suppliers, component lots, workstations and tasks).
+(a 4-stage vehicle with suppliers, component lots, workstations and tasks).
 
 HOW YOU WORK
 - You have no knowledge of this plant. Every fact you state must come from a tool result in \

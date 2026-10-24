@@ -8,9 +8,9 @@ const AGENT_TONE = { 'Supply Agent': 'amber', 'Scheduling Agent': 'blue', 'Monit
 
 function Card({ icon: Icon, title, desc, children }) {
   return (
-    <div className="rounded-xl border border-line bg-space-900/60 p-4">
-      <div className="mb-1 flex items-center gap-2 font-semibold text-white"><Icon size={16} className="text-accent-soft" />{title}</div>
-      <p className="mb-3 text-xs text-slate-400">{desc}</p>
+    <div className="rounded-xl border border-hairline bg-surface-0 p-4">
+      <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-ink"><Icon size={16} className="text-t-accent" />{title}</div>
+      <p className="mb-3 text-xs text-ink-3">{desc}</p>
       {children}
     </div>
   )
@@ -29,6 +29,7 @@ export default function ScenarioPanel({ open, onClose, onDone }) {
   const [rej, setRej] = useState('')
   const [ws, setWs] = useState('WS-04')
   const [wsh, setWsh] = useState(24)
+  const [armed, setArmed] = useState(false)     // two-step reset: first click arms, second runs
 
   const run = async (body) => {
     setBusy(true); setError(''); setReport(null)
@@ -65,12 +66,14 @@ export default function ScenarioPanel({ open, onClose, onDone }) {
         </Card>
         <Card icon={Clock} title="Advance time" desc="Run the factory clock forward: deliveries arrive, parts clear inspection, tasks start and finish.">
           <div className="grid grid-cols-4 gap-2">{[6, 12, 24, 48].map((h) => <button key={h} className="btn justify-center" disabled={busy} onClick={() => run({ type: 'ADVANCE_TIME', hours: h })}>+{h}h</button>)}</div>
-          <button className="btn mt-2 w-full" disabled={busy} onClick={() => { if (confirm('Reset the whole scenario to its initial state?')) run({ type: 'RESET' }) }}><RotateCcw size={14} />Reset scenario</button>
+          <button className={`btn mt-2 w-full ${armed ? 'btn-danger' : ''}`} disabled={busy}
+                  onClick={() => { if (armed) { setArmed(false); run({ type: 'RESET' }) } else { setArmed(true); setTimeout(() => setArmed(false), 4000) } }}>
+            <RotateCcw size={14} />{armed ? 'Click again to reset everything' : 'Reset scenario'}</button>
         </Card>
       </div>
       {busy && <Spinner label="Agents are responding… (OR-Tools is re-planning)" />}
-      {error && <div className="mt-4 rounded-lg border border-bad/40 bg-bad/10 p-3 text-sm text-red-200">{error}</div>}
-      {report?.reset && <div className="mt-4 rounded-lg border border-ok/40 bg-ok/10 p-3 text-sm text-green-200">Scenario reset.</div>}
+      {error && <div className="mt-4 rounded-lg border border-bad/40 bg-bad/10 p-3 text-sm text-t-critical">{error}</div>}
+      {report?.reset && <div className="mt-4 rounded-lg border border-ok/40 bg-ok/10 p-3 text-sm text-t-good">Scenario reset.</div>}
       {report && !report.reset && (
         <div className="mt-5 space-y-4">
           <h3 className="panel-title">Autonomous response</h3>
@@ -80,8 +83,8 @@ export default function ScenarioPanel({ open, onClose, onDone }) {
           {report.before && (
             <div className="grid grid-cols-3 gap-3 text-center text-sm">
               {[['Late tasks', 'tardy_tasks'], ['Weighted lateness', 'weighted_tardiness'], ['Launch review', 'launch_readiness']].map(([label, k]) => (
-                <div key={k} className="rounded-lg border border-line bg-space-900/60 p-3"><div className="text-[11px] uppercase tracking-wider text-slate-400">{label}</div>
-                  <div className="mt-1 font-semibold text-white">{report.before[k]} → <span className={report.after[k] !== report.before[k] ? 'text-amber-300' : ''}>{report.after[k]}</span></div></div>))}
+                <div key={k} className="rounded-lg border border-line bg-space-900/60 p-3"><div className="text-xs text-ink-3">{label}</div>
+                  <div className="mt-1 font-semibold text-ink">{report.before[k]} → <span className={report.after[k] !== report.before[k] ? 'text-t-warning' : ''}>{report.after[k]}</span></div></div>))}
             </div>
           )}
           {report.schedule_changes?.length > 0 && (

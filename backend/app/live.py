@@ -6,6 +6,7 @@ Default: OFF until Play is pressed; random disruptions ON.
 from __future__ import annotations
 
 import asyncio
+import os
 import random
 import threading
 from collections import deque
@@ -28,8 +29,15 @@ class LiveSim:
         self.feed: deque[dict] = deque(maxlen=300)
         self._id = 0
         self._since_disruption = COOLDOWN_H
-        self._rng = random.Random()
+        self._rng = self._new_rng()
         self.lock = threading.Lock()
+
+    @staticmethod
+    def _new_rng() -> random.Random:
+        """LIVE_SEED makes random disruptions reproducible (used by the end-to-end live check).
+        Unset - the default - keeps them genuinely random."""
+        seed = os.getenv("LIVE_SEED", "").strip()
+        return random.Random(int(seed)) if seed else random.Random()
 
     # ---------------------------------------------------------------- feed
     def push(self, db, kind: str, text: str, severity: str = "INFO") -> None:
@@ -58,6 +66,7 @@ class LiveSim:
             self.feed.clear()
             self._id = 0
         self._since_disruption = COOLDOWN_H
+        self._rng = self._new_rng()       # a reset replays the same disruptions when LIVE_SEED is set
 
     # ---------------------------------------------------------------- one plant hour
     def step(self, db) -> None:

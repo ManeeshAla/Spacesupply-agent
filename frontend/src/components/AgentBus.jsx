@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ArrowRight, Boxes, CalendarClock, Languages, MessageSquareShare, ShieldAlert, Truck } from 'lucide-react'
 import { get } from '../api'
 import { useApp } from '../ctx'
-import { Badge, Panel } from '../ui'
+import { Panel } from '../ui'
 
 const AGENT_ICON = { 'Tracking Agent': Boxes, 'Supply Agent': Truck, 'Scheduling Agent': CalendarClock, 'Monitoring Agent': ShieldAlert, 'Language Agent': Languages }
 const TOPIC_TONE = {
@@ -16,7 +16,7 @@ const short = (a = '') => a.replace(' Agent', '')
  * Live view of the message bus: what each agent published, and which conversation
  * (correlation id) it belongs to. Messages of one trigger share a colour stripe.
  */
-export default function AgentBus({ className = '', max = 40 }) {
+export default function AgentBus({ className = '', max = 40, title = 'Agent communication (message bus)', bodyClass = 'max-h-96 overflow-y-auto', height }) {
   const { tick } = useApp()
   const [messages, setMessages] = useState([])
   const since = useRef(0)
@@ -50,35 +50,34 @@ export default function AgentBus({ className = '', max = 40 }) {
   const rows = order.reverse().flatMap((id) => byConv[id]).slice(0, max)
   // one colour per conversation, so a delay and its re-plan and alerts line up visually
   const convs = [...new Set(rows.map((r) => r.correlation_id))]
-  const stripe = (id) => ['#3b82f6', '#22d3ee', '#a78bfa', '#f59e0b', '#22c55e'][convs.indexOf(id) % 5]
+  const stripe = (id) => ['rgb(var(--accent))', 'rgb(var(--aqua))', 'rgb(var(--violet))', 'rgb(var(--warning))', 'rgb(var(--ink-muted))'][convs.indexOf(id) % 5]
 
   return (
-    <Panel title="Agent communication (message bus)" className={className} bodyClass="max-h-96 overflow-y-auto"
-           right={<Badge tone="slate">{messages.length} message(s)</Badge>}>
+    <Panel title={title} subtitle="Agents talking to each other" className={className} data-testid="agent-bus" bodyClass={bodyClass} height={height}
+           right={<span className="text-xs tabular text-ink-muted">{messages.length} message{messages.length === 1 ? '' : 's'}</span>}>
       {rows.length === 0 ? (
-        <p className="text-sm text-slate-400">
-          No messages yet. The agents publish here when something happens — trigger a scenario, start live
-          mode, or ask the assistant to delay a delivery.
-        </p>
+        <div className="flex h-full flex-col items-center justify-center gap-1.5 px-4 text-center">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-2 text-ink-muted"><MessageSquareShare size={16} /></div>
+          <p className="text-sm font-medium text-ink">No messages yet</p>
+          <p className="max-w-xs text-[13px] text-ink-3">Agents publish here when something happens. Start live mode or trigger a scenario.</p>
+        </div>
       ) : (
-        <ul className="space-y-1.5">
+        <ul>
           {rows.map((msg) => {
             const I = AGENT_ICON[msg.sender] || MessageSquareShare
             return (
-              <li key={msg.id} className="flex gap-2.5 rounded-lg border border-line bg-space-900/60 p-2.5"
-                  style={{ borderLeft: `3px solid ${stripe(msg.correlation_id)}` }}>
-                <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-space-600 text-accent-soft">
-                  <I size={15} />
-                </div>
+              <li key={msg.id} data-testid="agent-bus-item" data-topic={msg.topic}
+                  className="flex gap-3 border-b border-hairline/60 py-2.5 pl-3 last:border-0" style={{ borderLeft: `2px solid ${stripe(msg.correlation_id)}` }}>
+                <I size={15} className="mt-0.5 shrink-0 text-ink-muted" />
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-                    <span className="font-semibold text-white">{short(msg.sender)}</span>
-                    <ArrowRight size={11} className="text-slate-500" />
-                    <span className="text-slate-400">{msg.recipient === '*' ? 'all agents' : short(msg.recipient)}</span>
-                    <Badge tone={TOPIC_TONE[msg.topic] || 'slate'}>{msg.topic}</Badge>
-                    <span className="ml-auto text-slate-500">{msg.time}</span>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+                    <span className="font-medium text-ink">{short(msg.sender)}</span>
+                    <ArrowRight size={11} className="text-ink-muted" />
+                    <span className="text-ink-3">{msg.recipient === '*' ? 'all agents' : short(msg.recipient)}</span>
+                    <span className="mono rounded bg-surface-2 px-1.5 py-px text-[11px] text-ink-2">{msg.topic}</span>
+                    <span className="ml-auto tabular text-ink-muted">{msg.time}</span>
                   </div>
-                  <div className="mt-1 text-xs text-slate-300">{msg.summary}</div>
+                  <div className="mt-1 text-[13px] leading-snug text-ink-2">{msg.summary}</div>
                 </div>
               </li>
             )
