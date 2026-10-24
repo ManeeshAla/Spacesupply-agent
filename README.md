@@ -33,7 +33,10 @@ and tools to acknowledge an alert, control live mode and move the dashboard.
   returned. After every answer, `llm.facts_grounded` checks each id and number against the raw tool
   output; if the model invented one, the answer is thrown away and replaced by a deterministic
   summary of the tool results (you see an "answer rewritten" badge). The older Qwen guard
-  (`facts_preserved`) still protects the rewording path.
+  (`facts_preserved`) still protects the rewording path. The check runs **after** the answer has
+  already streamed to the screen, so a bad answer can be visible for a moment before it's replaced;
+  numbers 0–10 are whitelisted (models use them to count what they just listed), so a wrong *small*
+  count could in principle slip through.
 * **Confirmation before anything changes.** The five simulation actions (delay a delivery, reject a
   component, take a workstation down, re-plan, advance the clock) do **not** run when the model asks
   for them. They return a pending action, the chat shows **Confirm / Cancel**, and only your click
@@ -41,7 +44,9 @@ and tools to acknowledge an alert, control live mode and move the dashboard.
   the model. Turn the gate off with the checkbox in the chat header (or `CONFIRM_ACTIONS=0`) for a
   hands-free demo.
 * **Memory.** A LangGraph `MemorySaver` keyed by session id, so *"and what about its supplier?"*
-  resolves against the previous turn. In-process, so it clears on restart or **New chat**.
+  resolves against the previous turn. It is in-process (not a database), so it clears on restart, on
+  **New chat**, and on a plant reset — the old conversation would otherwise refer to a state that no
+  longer exists.
 * **Streaming.** `POST /api/chat/stream` is server-sent events: `start`, `token`, `tool_call`,
   `tool_result`, `ui`, `block`, `pending`, `note`, `replace`, `done`.
 * **It drives the dashboard — only when asked.** `show_dashboard` is the one tool that moves the
@@ -51,7 +56,10 @@ and tools to acknowledge an alert, control live mode and move the dashboard.
 * **The Micro LM is still in the loop**, in three places: it runs first on every question and its
   intent/entity guess is injected as a hint, it powers the input autocomplete, and it is the
   **offline fallback** — if there is no API key, or Gemini errors or runs out of free quota, the
-  original Micro LM + template orchestrator answers instead and the UI says so.
+  original Micro LM + template orchestrator answers instead and the UI says so. The fallback is
+  **read-only** (it has no action intents and will say so if you ask it to change something) and has
+  no off-topic intent, so an off-topic question caught by the fallback is answered badly rather than
+  deflected — the one failure mode you'll occasionally see in the evaluation below.
 
 ### Agent-to-agent communication (message bus)
 `backend/app/bus.py`. Agents publish structured messages on topics and subscribe to the topics they
@@ -66,13 +74,59 @@ Monitoring Agent  --alerts.scanned-->     5 new alert(s), 0 resolved, 8 open
 
 Messages from one trigger share a `correlation_id` (one colour stripe in the UI) and are persisted in
 `agent_messages`. This is synchronous in-process pub/sub — real message passing between agent
-objects, not a distributed broker.
+objects, not a distributed broker, so there are no delivery retries and no cross-process delivery.
 
 ### The rest
 * **Micro LM** (`backend/app/microlm`): Embedding(32) → BiGRU(48) → intent head (14 intents) + BIO entity tagger + next-word head (chat autocomplete). **106,245 trainable parameters.** Trains in ~2 min on CPU; auto-trains on first start if `artifacts/microlm.pt` is missing.
 * **Scheduler**: flexible job-shop with precedence, component-readiness release times, workstation availability and deadlines. Objective = 10 × priority-weighted tardiness + makespan. Every task carries a *binding-constraint explanation* (waiting for component X / predecessor Y / workstation Z).
 * **Autonomy**: events trigger re-planning (warm-started CP-SAT), a monitoring scan and alerts; a background supervisor runs every 15 s. Schedules are versioned.
-* **Qwen layer (optional)**: if [Ollama](https://ollama.com) is running with `qwen2.5:3b-instruct`, the Micro LM's fallback answers are re-worded by Qwen; a guard rejects any rewrite that changes an ID or number. Without Ollama everything still works (deterministic wording).
+* **Qwen layer (optional)**: if [Ollama](https://ollama.com) is running with `qwen2.5:3b-instruct`, the Micro LM's fallback answers are re-worded by Qwen; a guard rejects any rewrite that changes an ID or number. Without Ollama everything still works (deterministic wording); this layer was not exercised in the build environment.
+* **Scope**: the simulated clock advances in whole hours, and there is no authentication — this is a
+  demo-scale prototype, not a hardened multi-user service.
+
+## The pages
+
+Eight pages, reachable from the sidebar or a direct URL (`#/schedule`, `#/alerts` …):
+
+* **Dashboard** (`#/dashboard`) — the plant overview and the page you land on.
+  * **Headline row:** four tiles — launch readiness (and how many hours behind, if any), open alerts
+    (and how many are critical), tasks currently running (and how many start in the next 24 h), and
+    component units on hand (lots, critical/low counts). Each tile is a shortcut to the page it
+    summarises.
+  * **Assembly progress:** a percentage bar per vehicle stage (tasks done / total, how many are
+    running right now) plus a line chart of all four stages' progress over time, with a "now" marker.
+  * **Needs attention:** the four most recent open alerts, newest first, each one tap away from the
+    full Alerts page.
+  * **Live activity + Agent communication, side by side:** the live-mode event log (deliveries,
+    inspections, task starts/finishes, disruptions, re-plans) next to the three-agent message bus, so
+    you can watch the plant and the agents reacting to it at the same time.
+  * **Today's schedule** (tasks running or starting in the next 24 h) and **upcoming deliveries**
+    (with any delay flagged), each linking to its full page.
+* **Schedule** (`#/schedule`) — the current optimised plan: a Gantt chart coloured by vehicle stage,
+  a red ring on any bar projected to miss its deadline, and a full task table (machine, start/end,
+  priority, deadline, dependencies, and the plain-language reason it's scheduled when it is). Pick an
+  algorithm (CP-SAT / Genetic Algorithm / Priority rule / FCFS) and press **Re-plan** to compare them
+  live. A workstation strip below shows every machine's current status.
+* **Components** (`#/components`) — all ~85 component lots across the four stages in one table;
+  click a row to open its full lifecycle history in a drawer.
+* **Inventory** (`#/inventory`) — whether the parts the current plan needs are on hand, on the way,
+  or short, as filterable tiles.
+* **Component tracking** (`#/tracking`) — a board view of every part's journey (Ordered → Received →
+  Inspection → Approved → Warehouse → Assembly bay → Installed, or Rejected → Replaced), searchable by
+  name or id, with a card per component you can click into.
+* **Alerts** (`#/alerts`) — everything the Monitoring Agent has raised (late deliveries, failed
+  inspections, machine downtime, projected lateness), groupable and bulk-acknowledgeable.
+* **Agents** (`#/agents`) — the five specialist agents (Tracking, Supply, Scheduling, Monitoring, and
+  the chat Supervisor) and the full **Agent communication** feed of what they've told each other,
+  grouped by the event that triggered each exchange.
+* **Assistant** (`#/chat`) — the chat interface described below, plus a collapsible "how the last
+  answer was built" panel (Micro LM hint, tools called, grounding check, model and latency) for anyone
+  who wants to see under the hood.
+* **Reports** (`#/reports`) — measured numbers for the chat assistant, the Micro LM and the four
+  schedulers, reproduced below in [Evaluation](#evaluation-measured).
+
+A floating launcher (bottom-right, described below) keeps the Assistant one tap away from every other
+page.
 
 ## The interface
 A neutral, high-contrast dark theme with a full light theme (toggle in the top bar; remembered per browser). The look is built from design tokens in `frontend/src/index.css` — surfaces, ink, one accent, reserved status colours — so a theme is a handful of CSS variables, and nothing in the markup hard-codes a colour.
@@ -133,6 +187,16 @@ Micro LM — each step is reported in the chat.
 
 Other env: `DATABASE_URL` (see `docker-compose.yml` for PostgreSQL), `USE_QWEN=auto|on|off`, `OLLAMA_URL`, `QWEN_MODEL`, `SUPERVISOR_ENABLED=0`.
 
+**Free-tier rate limits are the main practical constraint** on the chat assistant — the exact RPM/RPD
+are not published per model, and the bigger flash models exhaust their free allowance almost
+immediately (see the model-choice note above). `eval_chat.py` paces itself and may still need
+`--pace` raised. Hitting a limit mid-demo is handled, not prevented: you see the retry notice, then a
+Micro LM answer. Everything else — the dashboard, scheduling, simulation and live mode — has no such
+limit, since none of it calls an external API.
+
+**Prompts go to Google.** Free-tier input may be used by Google to improve their products; check
+their terms before pointing this at sensitive supplier data.
+
 ## Live mode (the demo everyone watches)
 Press **Play** in the header. The simulated clock then runs by itself: deliveries arrive, parts pass inspection into the warehouse, tasks start and finish, and the rocket, Gantt and progress chart move. **Random events** (on by default) inject a supplier delay, a failed inspection or a workstation outage every so often — the agents detect it, re-plan with CP-SAT and raise alerts while you watch. The **Live activity** panel on the dashboard is the running commentary.
 
@@ -142,7 +206,7 @@ Press **Play** in the header. The simulated clock then runs by itself: deliverie
 * Live mode starts **paused**, so nothing moves until you press Play.
 
 ## 3-minute demo
-1. Dashboard: overview, component donut, inventory, alerts, progress. Press **Play** and let it run while you talk.
+1. Dashboard: headline figures, assembly progress, needs attention, the two live feeds. Press **Play** and let it run while you talk.
 2. **AI Assistant** → *“Delay CMP-021's delivery by 24 hours.”* → the assistant explains what will happen and waits; press **Confirm**. The agents react, a new schedule version appears, alerts are raised.
 3. Agents page → **Agent communication**: the same event as a three-agent exchange (Supply → Scheduling → Monitoring) on one colour stripe.
 4. Back in chat: *“Why is it late now?”* then *“show me alerts for stage 2”* → the follow-up resolves from memory and the dashboard jumps to the filtered Alerts page by itself.
@@ -217,37 +281,14 @@ The validation score is inflated by template repetition; the held-out-template t
 On the single vehicle the algorithms almost tie (the problem is dominated by one long component-gated chain); the advantage of optimisation shows on the contended 3-vehicle campaign. Reproduce: `cd backend && python -m scripts.benchmark --n 30`.
 
 ## Tests
-`cd backend && pytest -q` → **88 tests, all offline, no API key needed.**
+`cd backend && pytest -q` → **94 tests, all offline, no API key needed** — they verify the wiring
+(tool dispatch, grounding, memory, the SSE protocol, the message bus), not Gemini's judgement. Only
+`scripts/eval_chat.py`, against the real API, measures the model's actual answers.
 
-The 34 original tests (schedule feasibility for all algorithms, event flow, lifecycle rules, API,
-chat, Micro LM parameter count) still pass unchanged. The 54 new ones use a scripted
-`FakeChatModel` (`backend/tests/fake_llm.py`) in place of Gemini and cover: every read tool against
-every task lifecycle state, tool dispatch and the step budget, the confirmation gate (pending →
-confirm / cancel / replay / demo mode), conversation memory and session isolation, the grounding
-guard, the retry → fallback-model → Micro LM chain, UI commands and inline tables, the SSE event
-order, and the three-agent message-bus exchange.
-
-## Limitations (be upfront in your viva)
-* **The chat evaluation numbers must be produced by running `scripts/eval_chat.py`** with your own
-  key — they are a live-API measurement, not a fixed result.
-* **Free-tier rate limits are the main practical constraint.** The exact RPM/RPD are not published
-  per model, and the bigger flash models exhaust their free allowance almost immediately (see the
-  model-choice note above). `eval_chat.py` paces itself and may still need `--pace` raised. Hitting a
-  limit mid-demo is handled, not prevented: you see the retry notice, then a Micro LM answer.
-* **Tests do not call the API.** All 88 run offline against a scripted fake model, so they verify the
-  wiring, not Gemini's judgement. Only `scripts/eval_chat.py` measures the real thing.
-* **The grounding guard runs after the answer is streamed**, so a bad answer can be briefly visible
-  before it is replaced. Numbers 0–10 are whitelisted (models use them to count what they just
-  listed), so a wrong *small* count could slip through.
-* **Chat memory is in-process** and keyed by session id: it clears on restart, on **New chat**, and
-  on a plant reset (the old conversation would refer to a state that no longer exists).
-* **The message bus is in-process pub/sub**, not a broker — no retries, no persistence of undelivered
-  messages, no cross-process delivery.
-* **Prompts go to Google.** Free-tier input may be used by Google to improve their products; check
-  their terms before pointing this at sensitive supplier data.
-* The Micro LM is trained on templates, so free-form phrasing is weaker than a real LLM, and it has
-  no action intents — **the offline fallback is read-only** and will say so if you ask it to change
-  something. It also has no off-topic intent, so when a fallback happens to catch an off-topic
-  question it answers it badly (this is the one evaluation failure you will sometimes see).
-* The Qwen layer needs Ollama and was not exercised in the build environment; the simulated clock is
-  in whole hours; no authentication (prototype).
+34 tests cover schedule feasibility for all four algorithms, event flow, lifecycle rules, the HTTP
+API and the Micro LM's parameter count. 54 more use a scripted `FakeChatModel`
+(`backend/tests/fake_llm.py`) in place of Gemini and cover: every read tool against every task
+lifecycle state, tool dispatch and the step budget, the confirmation gate (pending → confirm / cancel
+/ replay / demo mode), conversation memory and session isolation, the grounding guard, the retry →
+fallback-model → Micro LM chain, UI commands and inline tables, the SSE event order, and the
+three-agent message-bus exchange. The rest cover the message bus and live-mode wiring directly.
