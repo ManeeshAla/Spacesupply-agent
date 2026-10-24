@@ -39,7 +39,15 @@ export default function AgentBus({ className = '', max = 40 }) {
     return () => { alive = false; clearInterval(id) }
   }, [tick])
 
-  const rows = [...messages].reverse().slice(0, max)
+  // Newest conversation first, but inside one conversation oldest message first, so a cause
+  // (supplier.delay) reads above its effects (schedule.replanned, alerts.scanned).
+  const order = []
+  const byConv = {}
+  for (const m of messages) {
+    if (!byConv[m.correlation_id]) { byConv[m.correlation_id] = []; order.push(m.correlation_id) }
+    byConv[m.correlation_id].push(m)
+  }
+  const rows = order.reverse().flatMap((id) => byConv[id]).slice(0, max)
   // one colour per conversation, so a delay and its re-plan and alerts line up visually
   const convs = [...new Set(rows.map((r) => r.correlation_id))]
   const stripe = (id) => ['#3b82f6', '#22d3ee', '#a78bfa', '#f59e0b', '#22c55e'][convs.indexOf(id) % 5]

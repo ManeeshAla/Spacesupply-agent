@@ -44,9 +44,10 @@ and tools to acknowledge an alert, control live mode and move the dashboard.
   resolves against the previous turn. In-process, so it clears on restart or **New chat**.
 * **Streaming.** `POST /api/chat/stream` is server-sent events: `start`, `token`, `tool_call`,
   `tool_result`, `ui`, `block`, `pending`, `note`, `replace`, `done`.
-* **It drives the dashboard.** Tools return UI commands, so *"show me alerts for stage 3"* opens the
-  Alerts page with the filter set, and *"open CMP-021"* opens its drawer. Tools can also return small
-  tables rendered inside the chat.
+* **It drives the dashboard — only when asked.** `show_dashboard` is the one tool that moves the
+  screen, so *"show me alerts for stage 3"* opens the Alerts page with the filter set and *"open
+  CMP-021"* opens its drawer, while a plain question (*"what is delayed?"*) is answered in the chat
+  and leaves you where you are. Tools can also return small tables rendered inside the chat.
 * **The Micro LM is still in the loop**, in three places: it runs first on every question and its
   intent/entity guess is injected as a hint, it powers the input autocomplete, and it is the
   **offline fallback** — if there is no API key, or Gemini errors or runs out of free quota, the
@@ -149,6 +150,12 @@ Measured on `gemini-3.5-flash-lite`, free tier, October 2026:
 | Dashboard commands correct | 100% |
 | Fell back to the Micro LM | 2.2% |
 | Latency median / p90 | 2.6s / 16.1s |
+
+> **Re-measure before quoting this.** These figures were taken *before* the dashboard-navigation
+> change below (plain questions no longer move the screen; only `show_dashboard` does), which
+> changed what the 3 dashboard-control questions are judged on. The Gemini key used for the run
+> has since been revoked, so the table has not been re-run against the new behaviour. Run
+> `scripts/eval_chat.py` with a fresh key and replace it.
 
 Per category: reads 100%, follow-ups 100%, dashboard control 100%, actions 100%, tricky 100%,
 off-topic 67% (1 of 3).

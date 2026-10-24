@@ -95,6 +95,14 @@ def grade(q: dict, out: dict) -> dict:
         ui_ok = any(a in ui for a in q["ui"])
         if not ui_ok:
             notes.append(f"expected a {q['ui']} ui command, got {ui or 'none'}")
+        for key in q.get("ui_has") or []:          # e.g. "open CMP-021" must carry a component_id
+            if not any(key in c for c in out.get("ui_commands") or []):
+                ui_ok = False
+                notes.append(f"the ui command did not carry {key}")
+    elif ui:
+        # a question that did not ask to be shown something must leave the dashboard alone
+        ui_ok = False
+        notes.append(f"moved the dashboard ({ui}) on a plain question")
 
     grounded = bool(out.get("grounded", True))
     if not grounded:

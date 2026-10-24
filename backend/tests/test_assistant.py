@@ -128,11 +128,39 @@ def test_component_lookup_by_name_and_sloppy_id(db):
     assert b["id"] == "CMP-001"
 
 
-def test_read_tool_emits_ui_command(db):
+def test_plain_questions_never_move_the_dashboard(db):
+    """Asking is not the same as asking to be shown: only show_dashboard may navigate.
+
+    Seen in the browser: every read tool used to navigate, so "what is on the schedule?"
+    threw the user onto the Schedule page and hid the chat answer they had just asked for.
+    """
+    from app.assistant.tools import REGISTRY, write_tools
+    args = {"get_component": {"component": "CMP-021"}, "get_component_history": {"component": "CMP-021"},
+            "explain_task": {"task": "T-013"}, "get_task_readiness": {"task": "T-013"},
+            "get_schedule": {"window_hours": 24}, "get_alerts": {"stage": 2}, "get_stage_progress": {}}
+    skip = {"compare_schedulers", "acknowledge_alert", "control_live_mode", "show_dashboard", *write_tools()}
+    for name in REGISTRY:
+        if name in skip:
+            continue
+        ctx = ctx_for(db)
+        run_tool(ctx, name, args.get(name, {}))
+        assert not [e for e in ctx.events if e["type"] == "ui"], f"{name} moved the dashboard on a plain question"
+
+
+def test_show_dashboard_is_the_one_tool_that_navigates(db):
     ctx = ctx_for(db)
-    run_tool(ctx, "get_component", {"component": "CMP-021"})
-    ui = [e for e in ctx.events if e["type"] == "ui"]
-    assert ui and ui[0]["command"] == {"action": "open_component", "component_id": "CMP-021"}
+    run_tool(ctx, "show_dashboard", {"page": "alerts", "stage": 3, "component": "CMP-021"})
+    ui = [e["command"] for e in ctx.events if e["type"] == "ui"]
+    assert len(ui) == 1 and ui[0]["page"] == "alerts" and ui[0]["component_id"] == "CMP-021"
+
+
+def test_a_confirmed_action_leaves_the_user_in_the_chat(db, client):
+    out, _ctx, _f = ask(db, [{"tools": [("delay_delivery", {"component": "CMP-021", "hours": 12})]},
+                             {"text": "Confirm to apply."}], "delay CMP-021 by 12h", session="stay")
+    sessions.put("stay", out["pending_action"])
+    body = client.post("/api/chat/confirm", json={"action_id": out["pending_action"]["id"],
+                                                   "approve": True, "session_id": "stay"}).json()
+    assert body["ok"] and body["ui_commands"] == [], "the confirmation message must stay on screen"
 
 
 def test_alerts_tool_filters_by_stage(db):
@@ -384,7 +412,7 @@ def test_stream_endpoint_event_order(client, monkeypatch):
     kinds = [e["type"] for e in events]
     assert kinds[0] == "start" and kinds[-1] == "done"
     assert kinds.index("tool_call") < kinds.index("tool_result") < kinds.index("done")
-    assert "token" in kinds and "ui" in kinds
+    assert "token" in kinds and "ui" not in kinds, "a plain lookup must not navigate"
     assert "".join(e["text"] for e in events if e["type"] == "token").strip() == "CMP-021 is tracked."
     assert events[-1]["answer"] == "CMP-021 is tracked."
 

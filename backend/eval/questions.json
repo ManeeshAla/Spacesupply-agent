@@ -29,9 +29,9 @@
     {"id": "f05", "category": "follow_up", "q": "Show me alerts for stage 3.", "tools": ["get_alerts", "show_dashboard"]},
     {"id": "f06", "category": "follow_up", "q": "Only the critical ones please.", "follow_up_of": "f05", "tools": ["get_alerts", "show_dashboard"]},
 
-    {"id": "u01", "category": "ui", "q": "Open CMP-021 for me.", "tools": ["show_dashboard", "get_component"], "ui": ["open_component"]},
-    {"id": "u02", "category": "ui", "q": "Take me to the schedule page.", "tools": ["show_dashboard", "get_schedule"], "ui": ["navigate"]},
-    {"id": "u03", "category": "ui", "q": "Show me the reports.", "tools": ["show_dashboard", "compare_schedulers"], "ui": ["navigate"]},
+    {"id": "u01", "category": "ui", "q": "Open CMP-021 for me.", "tools": ["show_dashboard"], "ui": ["navigate"], "ui_has": ["component_id"]},
+    {"id": "u02", "category": "ui", "q": "Take me to the schedule page.", "tools": ["show_dashboard"], "ui": ["navigate"]},
+    {"id": "u03", "category": "ui", "q": "Show me the reports.", "tools": ["show_dashboard"], "ui": ["navigate"]},
 
     {"id": "a01", "category": "action", "q": "Delay CMP-021's delivery by 24 hours.", "tools": ["delay_delivery"], "confirms": true},
     {"id": "a02", "category": "action", "q": "The part in inspection failed, reject CMP-005.", "tools": ["reject_component"], "confirms": true},

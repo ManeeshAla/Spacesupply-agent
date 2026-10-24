@@ -138,7 +138,9 @@ function Message({ m, compact, onResolve }) {
               </div>
             )}
             {m.blocks?.map((b, i) => <Block key={i} block={b} />)}
-            {m.pending && <ConfirmCard action={m.pending} onResolve={(a, ok) => onResolve(m.id, a, ok)} />}
+            {/* only once the message has finished: confirming mid-sentence leaves a stale
+                "please press Confirm" bubble next to an action that already ran */}
+            {m.pending && !m.streaming && <ConfirmCard action={m.pending} onResolve={(a, ok) => onResolve(m.id, a, ok)} />}
             {m.resolved === 'cancelled' && <div className="mt-2 text-[11px] text-slate-400">Cancelled – nothing was changed.</div>}
             <SourceBadges m={m} compact={compact} />
           </>

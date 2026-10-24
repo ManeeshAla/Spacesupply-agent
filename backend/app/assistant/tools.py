@@ -10,7 +10,11 @@ Three kinds of tool:
   * action tools      - change the simulation. With CONFIRM_ACTIONS on (the default) they
                         do NOT run: they register a pending action and the UI asks the user
                         to confirm first.
-  * ui tools          - return a command that moves the dashboard (open a page / a drawer).
+  * ui tool           - `show_dashboard` is the ONLY tool that moves the user's screen. A plain
+                        question ("what is delayed?") is answered in the chat; the dashboard
+                        moves only when the user says "show me" / "open" / "take me to".
+                        (Earlier every read tool navigated, so asking about the schedule threw
+                        the user off the chat page and hid the answer.)
 
 Each tool returns a plain dict. `ui` and `blocks` keys are stripped out by the supervisor
 and forwarded to the frontend; the rest is what the model gets to read.
@@ -169,8 +173,7 @@ def get_component(ctx: ToolCtx, component: str) -> dict:
         "ready_in_hours": loc.get("ready_in_hours"),
         "delivery": {"id": d["id"], "status": d["status"], "delay_hours": d["delay_hours"],
                      "quantity": d["quantity"], "eta": _when(db, d["eta_hour"])} if d else None,
-        "used_by_tasks": users,
-        "ui": {"action": "open_component", "component_id": c.id},
+        "used_by_tasks": users
     }
 
 
@@ -183,8 +186,8 @@ def get_component_history(ctx: ToolCtx, component: str) -> dict:
     return {"id": c.id, "name": c.name, "events": [
         {"time": fmt(db, e.hour), "hour": e.hour, "event": e.event_type, "from": e.from_status,
          "to": e.to_status, "location": e.location,
-         "note": "" if e.note == "Seed history" else e.note} for e in ev[-14:]],
-        "ui": {"action": "open_component", "component_id": c.id}}
+         "note": "" if e.note == "Seed history" else e.note} for e in ev[-14:]]
+        }
 
 
 class ListComponentsArgs(BaseModel):
@@ -209,9 +212,8 @@ def list_components(ctx: ToolCtx, status: str | None = None, stage: int | None =
         rows = [c for c in rows if ql in c.id.lower() or ql in c.name.lower() or ql in c.location.lower()]
     out = [{"id": c.id, "name": c.name, "status": c.status, "location": c.location, "stage_id": c.stage_id,
             "on_hand": c.quantity, "required": c.required_quantity} for c in rows[:25]]
-    return {"count": len(rows), "showing": len(out), "components": out,
-            "ui": {"action": "navigate", "page": "components",
-                   "filters": {"stage": stage or 0, "query": query or "", "status": (status or "").upper()}}}
+    return {"count": len(rows), "showing": len(out), "components": out
+            }
 
 
 class StageArgs(BaseModel):
@@ -230,8 +232,8 @@ def get_inventory(ctx: ToolCtx, stage: int | None = None) -> dict:
                                "available": r["available"], "shortage": r["shortage"], "class": r["class"],
                                "status": r["status"], "incoming": r["incoming"],
                                "next_eta": _when(db, r["next_eta_hour"]), "delayed": r["delayed"],
-                               "supplier": r["supplier"]} for r in rows[:8]],
-            "ui": {"action": "navigate", "page": "inventory"}}
+                               "supplier": r["supplier"]} for r in rows[:8]]
+            }
 
 
 class ShortageArgs(BaseModel):
@@ -329,11 +331,9 @@ def get_schedule(ctx: ToolCtx, stage: int | None = None, workstation: str | None
             "workstation": r["workstation"], "start": _when(db, r["start_hour"]), "end": _when(db, r["end_hour"]),
             "duration_hours": r["duration"], "priority": r["priority"], "late_hours": r["late_hours"],
             "moved_hours": r["shift_hours"], "reason": r["reason_text"]} for r in rows[:14]]
-    ui = {"action": "navigate", "page": "schedule",
-          "filters": {"schedule": str(stage) if stage else ("LATE" if late_only else "ACTIVE")}}
     return {"scope": title, "now": fmt(db, now), "count": len(rows), "showing": len(out),
             "plan_version": ver.id if ver else None, "algorithm": ver.algorithm if ver else None,
-            "tasks": out, "ui": ui,
+            "tasks": out,
             "blocks": [{"type": "table", "title": f"Schedule – {title}",
                         "columns": ["Task", "Name", "Workstation", "Starts", "Late"],
                         "rows": [[r["task_id"], r["name"], r["workstation"] or "-",
@@ -364,8 +364,8 @@ def explain_task(ctx: ToolCtx, task: str) -> dict:
             "late_hours": ex.get("late_hours", 0), "reason_type": ex.get("reason_type"),
             "reason": ex.get("reason"), "why_chain": ex.get("chain", []),
             "can_start_now": rd["can_start_now"],
-            "blockers": [{"type": b["type"], "ref": b["ref"], "text": b["text"]} for b in rd["blockers"][:6]],
-            "ui": {"action": "open_task", "task_id": ex["task_id"]}}
+            "blockers": [{"type": b["type"], "ref": b["ref"], "text": b["text"]} for b in rd["blockers"][:6]]
+            }
 
 
 class EmptyArgs(BaseModel):
@@ -384,8 +384,8 @@ def get_delayed_tasks(ctx: ToolCtx) -> dict:
                        "start": _when(db, r["start_hour"]), "reason": r["reason_text"]} for r in rows[:10]],
             "deliveries": [{"id": d.id, "component_id": d.component_id, "component": d.component.name,
                             "supplier": d.supplier.name, "delay_hours": d.delay_hours,
-                            "eta": _when(db, d.eta_hour)} for d in dd[:8]],
-            "ui": {"action": "navigate", "page": "schedule", "filters": {"schedule": "LATE"}}}
+                            "eta": _when(db, d.eta_hour)} for d in dd[:8]]
+            }
 
 
 class AlertArgs(BaseModel):
@@ -417,10 +417,8 @@ def get_alerts(ctx: ToolCtx, status: str | None = None, severity: str | None = N
             "alerts": [{"id": a.id, "severity": a.severity, "category": a.category, "title": a.title,
                         "message": a.message, "task_id": a.task_id, "component_id": a.component_id,
                         "stage_id": _stage_of_alert(db, a), "status": a.status,
-                        "raised": fmt(db, a.created_hour)} for a in rows[:10]],
-            "ui": {"action": "navigate", "page": "alerts",
-                   "filters": {"alertStatus": want, "alertSeverity": (severity or "ALL").upper(),
-                               "alertStage": stage or 0}}}
+                        "raised": fmt(db, a.created_hour)} for a in rows[:10]]
+            }
 
 
 @tool("get_stage_progress", "Assembly progress per vehicle stage: percent complete, tasks done / running, "
@@ -431,8 +429,8 @@ def get_stage_progress(ctx: ToolCtx, stage: int | None = None) -> dict:
     sel = [s for s in stages if stage is None or s["id"] == stage]
     k = eng._kpis(db)
     return {"stages": sel, "launch_readiness": k["launch_readiness"],
-            "launch_readiness_late_hours": k["launch_readiness_late_hours"],
-            "ui": {"action": "navigate", "page": "tracking"}}
+            "launch_readiness_late_hours": k["launch_readiness_late_hours"]
+            }
 
 
 class DeliveryArgs(BaseModel):
@@ -476,8 +474,8 @@ def get_task_readiness(ctx: ToolCtx, task: str | None = None, stage: int | None 
                 "planned_workstation": rd.get("planned_workstation"),
                 "blockers": [{"type": b["type"], "ref": b["ref"], "text": b["text"],
                               "eta_hours": b.get("eta_hours")} for b in rd["blockers"][:8]],
-                "components": rd["components"][:10],
-                "ui": {"action": "open_task", "task_id": rd["task_id"]}}
+                "components": rd["components"][:10]
+                }
     if stage:
         rd = eng.scheduling.stage_readiness(db, stage)
         return {"kind": "stage", "stage_id": rd["stage_id"], "stage": rd["stage"], "ready": rd["ready"],
@@ -498,7 +496,7 @@ def compare_schedulers(ctx: ToolCtx) -> dict:
     with ctx.guard():
         res = eng.scheduling.compare(ctx.db)
     return {"objective": "10 x priority-weighted tardiness + makespan (lower is better)",
-            "results": res, "ui": {"action": "navigate", "page": "reports"}}
+            "results": res }
 
 
 @tool("get_plant_status", "One-shot overview: system status, open alert counts, tasks running, components by "
@@ -540,8 +538,8 @@ def get_agent_messages(ctx: ToolCtx) -> dict:
     return {"count": len(rows),
             "messages": [{"topic": r["topic"], "from": r["sender"], "to": r["recipient"],
                           "summary": r["summary"], "time": r["time"],
-                          "correlation_id": r["correlation_id"]} for r in rows],
-            "ui": {"action": "navigate", "page": "agents"}}
+                          "correlation_id": r["correlation_id"]} for r in rows]
+            }
 
 
 # ================================================================ UI TOOL
@@ -660,8 +658,8 @@ def replan_schedule(ctx: ToolCtx, algorithm: str = "CPSAT") -> dict:
             "metrics": met, "tasks_moved": len(res.get("changes") or []),
             "changes": [{"task_id": c["task_id"], "name": c["name"], "moved_hours": c["delta_hours"],
                          "reason": c["reason"]} for c in (res.get("changes") or [])[:6]],
-            "agent_steps": res.get("steps", []),
-            "ui": {"action": "navigate", "page": "schedule"}}
+            "agent_steps": res.get("steps", [])
+            }
 
 
 class AdvanceArgs(BaseModel):
@@ -697,8 +695,8 @@ def acknowledge_alert(ctx: ToolCtx, alert_id: int) -> dict:
     with ctx.guard():
         a = eng.monitoring.ack(db, int(alert_id))
         db.commit()
-    return {"action": "acknowledge_alert", "id": a.id, "title": a.title, "status": a.status,
-            "ui": {"action": "navigate", "page": "alerts", "filters": {"alertStatus": "ALL"}}}
+    return {"action": "acknowledge_alert", "id": a.id, "title": a.title, "status": a.status
+            }
 
 
 class LiveArgs(BaseModel):
@@ -736,8 +734,8 @@ def _event_result(db, res: dict, headline: str) -> dict:
                                   "launch_readiness": before["launch_readiness"]},
                        "after": {"tardy_tasks": after["tardy_tasks"], "makespan": after["makespan"],
                                  "launch_readiness": after["launch_readiness"],
-                                 "launch_late_hours": after["launch_readiness_late_hours"]}},
-            "ui": {"action": "navigate", "page": "schedule"}}
+                                 "launch_late_hours": after["launch_readiness_late_hours"]}}
+            }
 
 
 # ---------------------------------------------------------------- dispatch
