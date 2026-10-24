@@ -50,12 +50,17 @@ function ChatEval({ ev, gemini }) {
     )
   }
   const o = ev.overall
+  const q = ev.quality || {}
   const cats = Object.entries(ev.by_category || {}).map(([k, v]) => ({ name: CAT_LABEL[k] || k, accuracy: v.accuracy, n: v.n }))
+  // quality (what the assistant got right) is kept apart from availability (free-tier fallbacks):
+  // a fallback means the API was unreachable, which says nothing about the model's judgement
   const cards = [
-    ['Overall accuracy', `${o.accuracy}%`], ['Correct tool chosen', `${o.tool_choice_accuracy}%`],
-    ['Answer content', `${o.answer_accuracy}%`], ['Grounded answers', `${o.grounded}%`],
+    [`Accuracy (${ev.answered ?? '–'} answered)`, q.accuracy == null ? `${o.accuracy}%` : `${q.accuracy}%`],
+    ['Correct tool chosen', q.tool_choice_accuracy == null ? `${o.tool_choice_accuracy}%` : `${q.tool_choice_accuracy}%`],
+    ['Grounded answers', q.grounded == null ? `${o.grounded}%` : `${q.grounded}%`],
     ['Confirmation respected', o.confirmation_respected == null ? '–' : `${o.confirmation_respected}%`],
     ['Dashboard commands', o.ui_command_accuracy == null ? '–' : `${o.ui_command_accuracy}%`],
+    ['End to end (all questions)', `${o.accuracy}%`],
     ['Fell back to Micro LM', `${o.fallback_rate}%`],
     ['Latency median / p90', `${o.latency_ms_median ?? '–'} / ${o.latency_ms_p90 ?? '–'} ms`],
   ]
@@ -72,10 +77,17 @@ function ChatEval({ ev, gemini }) {
           ))}
         </dl>
         <p className="mt-3 text-xs text-slate-400">
-          A question counts as passed only if the right tool was called, the answer contained what it should
-          (and nothing it should not), the grounding guard passed, an action stopped for confirmation, and the
-          model did not fall back. Run in {ev.duration_s}s, paced for the free tier.
+          A question passes only if the right tool was called, the answer contained what it should (and nothing
+          it should not), the grounding guard passed and an action stopped for confirmation. Accuracy covers the
+          questions Gemini answered; a fallback means the free tier was unavailable, so it is counted separately
+          rather than blamed on the model. Run in {ev.duration_s}s, paced for the free tier.
         </p>
+        {o.fallback_rate > 10 && (
+          <p className="mt-2 rounded-lg border border-warn/40 bg-warn/10 px-2.5 py-1.5 text-[11px] text-amber-200">
+            {o.fallback_rate}% of questions fell back to the offline Micro LM, so the end-to-end figure mostly
+            reflects free-tier availability. Re-run when the quota has reset.
+          </p>
+        )}
       </Panel>
       <Panel title="Accuracy by question type" className="col-span-12 xl:col-span-5">
         <div className="h-64">

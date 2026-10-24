@@ -543,3 +543,46 @@ def test_an_ungrounded_answer_with_no_tool_data_is_refused_not_rephrased(db):
     assert "CMP-084" not in out["answer"]
     assert "outside what I cover" in out["answer"]
     assert "rephrase" not in out["answer"].lower()
+
+
+def test_a_lookup_does_not_also_navigate(db):
+    """The model used to call the right read tool and then show_dashboard anyway, which threw
+    the user off the chat page and hid the answer they had just asked for."""
+    out, _ctx, _f = ask(db, [{"tools": [("get_component", {"component": "CMP-021"})]},
+                             {"text": "CMP-021 is in transit."}], "where is CMP-021?")
+    assert out["ui_commands"] == []
+
+
+def test_the_prompt_tells_the_model_when_not_to_navigate():
+    p = supervisor.SYSTEM_PROMPT
+    assert "do NOT call show_dashboard" in p
+    assert "Never call it merely because you used a read tool." in p
+
+
+def test_a_followup_may_restate_what_an_earlier_turn_looked_up(db):
+    """Judging a follow-up against only its own tool output rejected correct recall.
+
+    Seen live: after "Is stage 2 ready?" answered from get_task_readiness, the follow-up
+    "What is blocking it?" was replaced with "that is outside what I cover".
+    """
+    sessions.clear()
+    fake = FakeChatModel([
+        {"tools": [("get_component", {"component": "CMP-021"})]},
+        {"text": "CMP-021 (Fuel Pump) is on order."},
+        {"text": "As I said, CMP-021 (Fuel Pump) is the blocker."},   # no tool call this turn
+    ])
+    supervisor.run(ctx_for(db), "where is CMP-021?", "recall", model_factory=fake.factory())
+    out = supervisor.run(ctx_for(db), "what is blocking it?", "recall", model_factory=fake.factory())
+    assert out["tools_called"] == []
+    assert out["grounded"] is True, f"correct recall rejected: {out.get('ungrounded')}"
+    assert "CMP-021" in out["answer"] and "outside what I cover" not in out["answer"]
+
+
+def test_recall_is_scoped_to_one_conversation(db):
+    sessions.clear()
+    fake = FakeChatModel([{"tools": [("get_component", {"component": "CMP-021"})]},
+                          {"text": "CMP-021 is on order."},
+                          {"text": "CMP-021 is the blocker."}])
+    supervisor.run(ctx_for(db), "where is CMP-021?", "sess-a", model_factory=fake.factory())
+    out = supervisor.run(ctx_for(db), "what is blocking it?", "sess-b", model_factory=fake.factory())
+    assert out["grounded"] is False, "another session's lookups must not ground this answer"

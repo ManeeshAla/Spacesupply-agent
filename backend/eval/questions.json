@@ -1,5 +1,5 @@
 {
-  "note": "Evaluation set for the Gemini supervisor. 'tools' lists the tool(s) the answer must be built from (any one of them counts as correct unless 'all_tools' is true). 'expect' holds substrings the answer should contain; 'reject' holds substrings that mean the answer went wrong. 'follow_up_of' chains a question onto the previous one in the same session.",
+  "policy": "Navigation rule: a request for DATA is answered in the chat (with an inline table if useful) and must not move the screen, because navigating away hides the answer. Only a request about the SCREEN itself - 'take me to the schedule page', 'open CMP-021', 'show me the reports' - may call show_dashboard. Questions with no 'ui' key below must produce no ui command.", "note": "Evaluation set for the Gemini supervisor. 'tools' lists the tool(s) the answer must be built from (any one of them counts as correct unless 'all_tools' is true). 'expect' holds substrings the answer should contain; 'reject' holds substrings that mean the answer went wrong. 'follow_up_of' chains a question onto the previous one in the same session.",
   "questions": [
     {"id": "r01", "category": "read", "q": "Where is CMP-021?", "tools": ["get_component"], "expect": ["CMP-021"]},
     {"id": "r02", "category": "read", "q": "What is the status of the fuel pump?", "tools": ["get_component"], "expect": ["CMP-"]},
@@ -26,7 +26,7 @@
     {"id": "f02", "category": "follow_up", "q": "And what about its supplier?", "follow_up_of": "f01", "tools": ["get_supplier"], "reject": ["which component", "which one"]},
     {"id": "f03", "category": "follow_up", "q": "Is stage 2 ready?", "tools": ["get_task_readiness"]},
     {"id": "f04", "category": "follow_up", "q": "What is blocking it?", "follow_up_of": "f03", "tools": ["get_task_readiness", "get_shortages", "explain_task"]},
-    {"id": "f05", "category": "follow_up", "q": "Show me alerts for stage 3.", "tools": ["get_alerts", "show_dashboard"]},
+    {"id": "f05", "category": "follow_up", "q": "Show me alerts for stage 3.", "tools": ["get_alerts"]},
     {"id": "f06", "category": "follow_up", "q": "Only the critical ones please.", "follow_up_of": "f05", "tools": ["get_alerts", "show_dashboard"]},
 
     {"id": "u01", "category": "ui", "q": "Open CMP-021 for me.", "tools": ["show_dashboard"], "ui": ["navigate"], "ui_has": ["component_id"]},

@@ -1,46 +1,52 @@
 {
-  "generated_at": "2026-10-23 16:57 UTC",
+  "generated_at": "2026-10-24 04:11 UTC",
   "model": "gemini-3.5-flash-lite",
   "fallback_model": "gemini-3.1-flash-lite",
   "questions": 46,
-  "duration_s": 494.5,
+  "duration_s": 728.8,
+  "answered": 42,
+  "quality": {
+    "accuracy": 97.6,
+    "tool_choice_accuracy": 97.4,
+    "grounded": 100.0
+  },
   "overall": {
-    "accuracy": 97.8,
-    "tool_choice_accuracy": 100.0,
-    "answer_accuracy": 97.8,
+    "accuracy": 89.1,
+    "tool_choice_accuracy": 88.1,
+    "answer_accuracy": 100.0,
     "grounded": 100.0,
-    "confirmation_respected": 100.0,
+    "confirmation_respected": 80.0,
     "ui_command_accuracy": 100.0,
-    "fallback_rate": 2.2,
-    "latency_ms_median": 2570,
-    "latency_ms_p90": 16091
+    "fallback_rate": 8.7,
+    "latency_ms_median": 3626,
+    "latency_ms_p90": 18997
   },
   "by_category": {
     "action": {
       "n": 8,
-      "accuracy": 100.0,
-      "tool_choice": 100.0,
+      "accuracy": 87.5,
+      "tool_choice": 87.5,
       "answer": 100.0,
       "grounded": 100.0
     },
     "follow_up": {
       "n": 6,
-      "accuracy": 100.0,
-      "tool_choice": 100.0,
+      "accuracy": 83.3,
+      "tool_choice": 83.3,
       "answer": 100.0,
       "grounded": 100.0
     },
     "off_topic": {
       "n": 3,
-      "accuracy": 66.7,
+      "accuracy": 100.0,
       "tool_choice": null,
-      "answer": 66.7,
+      "answer": 100.0,
       "grounded": 100.0
     },
     "read": {
       "n": 20,
-      "accuracy": 100.0,
-      "tool_choice": 100.0,
+      "accuracy": 90.0,
+      "tool_choice": 90.0,
       "answer": 100.0,
       "grounded": 100.0
     },
@@ -53,19 +59,47 @@
     },
     "ui": {
       "n": 3,
-      "accuracy": 100.0,
-      "tool_choice": 100.0,
+      "accuracy": 66.7,
+      "tool_choice": 66.7,
       "answer": 100.0,
       "grounded": 100.0
     }
   },
   "failures": [
     {
-      "id": "o03",
-      "question": "What do you think about the real ISRO launch schedule?",
+      "id": "r10",
+      "question": "How far along is stage 3?",
       "notes": [
-        "called ['Language Agent'] for an off-topic question",
-        "did not deflect an off-topic question"
+        "expected one of ['get_stage_progress'], called ['Language Agent', 'Tracking Agent']"
+      ]
+    },
+    {
+      "id": "r14",
+      "question": "What is scheduled on WS-04?",
+      "notes": [
+        "expected one of ['get_schedule'], called ['Language Agent', 'Scheduling Agent']"
+      ]
+    },
+    {
+      "id": "f04",
+      "question": "What is blocking it?",
+      "notes": [
+        "expected one of ['get_task_readiness', 'get_shortages', 'explain_task'], called nothing"
+      ]
+    },
+    {
+      "id": "u03",
+      "question": "Show me the reports.",
+      "notes": [
+        "expected one of ['show_dashboard'], called ['Language Agent', 'Scheduling Agent']"
+      ]
+    },
+    {
+      "id": "a04",
+      "question": "Re-plan the schedule with the genetic algorithm.",
+      "notes": [
+        "expected one of ['replan_schedule'], called ['Language Agent', 'Scheduling Agent']",
+        "an action ran (or was skipped) without asking for confirmation"
       ]
     }
   ],
@@ -84,15 +118,13 @@
       "tools_called": [
         "get_component"
       ],
-      "ui_commands": [
-        "open_component"
-      ],
+      "ui_commands": [],
       "expected_tools": [
         "get_component"
       ],
-      "latency_ms": 4293,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "Component CMP-021 (Fuel Pump) is currently **In transit (supplier)**.\n- Lifecycle status: **ORDERED**\n- Inspection status: **PENDING**\n- Quantity on hand: **0** (required: 1)\n- Supplier: **Orbital Forge Industries**\n- Delivery ETA: **24 Oct 12:00** (in 14 hours, delivery ID DEL-001)\n- Used by task: **T-013** (Turbopump & Engine Installation)",
+      "latency_ms": 11935,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "CMP-021 (Fuel Pump) is currently **in transit** from the supplier, Orbital Forge Industries. It is scheduled to arrive on 24 Oct at 23:00 (in 14 hours). It is currently ordered and has not yet undergone inspection.",
       "notes": [],
       "pending": null
     },
@@ -110,15 +142,13 @@
       "tools_called": [
         "get_component"
       ],
-      "ui_commands": [
-        "open_component"
-      ],
+      "ui_commands": [],
       "expected_tools": [
         "get_component"
       ],
-      "latency_ms": 10725,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "- Component lot **CMP-021** (Fuel Pump) has lifecycle status **ORDERED** in stage **2**.\n- Its physical location is **In transit (supplier)**, supplied by **Orbital Forge Industries**.\n- Current quantity on hand is **0** (required **1**), with an inspection status of **PENDING** and zero usable now.\n- Its delivery **DEL-001** is **ON_TIME** with an ETA in **14** hours (24 Oct 12:00).\n- It is used ",
+      "latency_ms": 2818,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "The **Fuel Pump (CMP-021)** is currently **ORDERED** and in transit from Orbital Forge Industries.\n- It is not yet on-site (quantity on hand: 0).\n- Delivery is expected today, **24 Oct at 23:00** (in 14 hours).\n- It is required for **Turbopump & Engine Installation (T-013)**, which is currently pending.\n- It will be ready for use in **22 hours**.",
       "notes": [],
       "pending": null
     },
@@ -136,16 +166,14 @@
       "tools_called": [
         "get_inventory"
       ],
-      "ui_commands": [
-        "navigate"
-      ],
+      "ui_commands": [],
       "expected_tools": [
         "get_inventory",
         "get_plant_status"
       ],
-      "latency_ms": 11849,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "- Inventory status: **23** lots sufficient, **8** low, **8** critical, and **12** on order (28 short lots total).\n- Top shortages include:\n  - **CMP-031** (Main Propellant Valve): 0 available, 2 required, status **IN_INSPECTION**.\n  - **CMP-082** (Range Safety Receiver): 0 available, 2 required, ETA **26 Oct 17:00**.\n  - **CMP-021** (Fuel Pump): 0 available, 1 required, ETA **24 Oct 12:00**.\n  - *",
+      "latency_ms": 2230,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "Inventory status across the whole vehicle is currently:\n- 23 sufficient, 8 low, 8 critical, and 12 on order.\n- There are 28 short component lots.\n\nThe most critical shortages include the **Main Propellant Valve (CMP-031)**, **Range Safety Receiver (CMP-082)**, and **Fuel Pump (CMP-021)**.",
       "notes": [],
       "pending": null
     },
@@ -168,9 +196,9 @@
         "get_shortages",
         "get_inventory"
       ],
-      "latency_ms": 2551,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "Yes, Stage 2 has 6 shortages:\n- **CMP-031** (Main Propellant Valve): 2 short, status IN_INSPECTION, blocking T-014.\n- **CMP-021** (Fuel Pump): 1 short, status ORDERED (ETA 24 Oct 12:00), blocking T-013.\n- **CMP-032** (Flexible Bellows Joint): 4 short, status INSPECTION_PENDING, blocking T-014.\n- **CMP-037** (Hot-Fire Instrumentation Kit): 1 short, status INSPECTION_PENDING, blocking T-016.\n- **CMP",
+      "latency_ms": 3074,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "Yes, stage 2 has several shortages:\n- **CMP-031** (Main Propellant Valve): 2 short (required for T-014), in inspection.\n- **CMP-021** (Fuel Pump): 1 short (required for T-013), arrives in 14 hours.\n- **CMP-032** (Flexible Bellows Joint): 4 short (required for T-014), inspection pending.\n- **CMP-037** (Hot-Fire Instrumentation Kit): 1 short (required for T-016), inspection pending.\n- **CMP-039** (S",
       "notes": [],
       "pending": null
     },
@@ -192,9 +220,9 @@
       "expected_tools": [
         "get_supplier"
       ],
-      "latency_ms": 1892,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "CMP-003 (Casing Joint Clamp) is supplied by **Sagar Composites**.\n- Reliability: **0.89**\n- Lead time: **8** days",
+      "latency_ms": 21427,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "CMP-003 (Casing Joint Clamp) is supplied by **Sagar Composites**. They have a reliability rating of **0.89** and an average lead time of **8 days**.",
       "notes": [],
       "pending": null
     },
@@ -210,19 +238,15 @@
       "ui_ok": null,
       "fell_back": false,
       "tools_called": [
-        "get_schedule",
-        "show_dashboard"
+        "get_schedule"
       ],
-      "ui_commands": [
-        "navigate",
-        "navigate"
-      ],
+      "ui_commands": [],
       "expected_tools": [
         "get_schedule"
       ],
-      "latency_ms": 2589,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "Here is the assembly schedule for the next 24 hours (plant time **23 Oct 22:00**):\n\n- **T-011** (Stage 2 Tank Integration): **WS-02**, in progress, ends 24 Oct 06:00.\n- **T-021** (Upper Motor Igniter & Safe-Arm Fit): **WS-04**, in progress, ends 24 Oct 02:00.\n- **T-023** (Stage 3 Avionics Harness): **WS-05**, starting now, ends 24 Oct 04:00.\n- **T-015** (Stage 2 Avionics System Check): **WS-05**, ",
+      "latency_ms": 8267,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "The assembly schedule for the next 24 hours (as of 24 Oct 09:00) includes these tasks:\n\n- **T-011** (Stage 2 Tank Integration): In progress on WS-02, finishes 24 Oct 17:00.\n- **T-021** (Upper Motor Igniter & Safe-Arm Fit): In progress on WS-04, finishes 24 Oct 13:00.\n- **T-023** (Stage 3 Avionics Harness): Starts 24 Oct 09:00 on WS-05, finishes 24 Oct 15:00.\n- **T-015** (Stage 2 Avionics System Ch",
       "notes": [],
       "pending": null
     },
@@ -240,16 +264,14 @@
       "tools_called": [
         "get_delayed_tasks"
       ],
-      "ui_commands": [
-        "navigate"
-      ],
+      "ui_commands": [],
       "expected_tools": [
         "get_delayed_tasks",
         "get_schedule"
       ],
-      "latency_ms": 10691,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "There are currently no delayed tasks or delayed deliveries in the plant. All tasks are running on schedule.",
+      "latency_ms": 34817,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "There are currently no delayed tasks or delayed deliveries. All assembly operations are proceeding according to the schedule.",
       "notes": [],
       "pending": null
     },
@@ -267,15 +289,13 @@
       "tools_called": [
         "explain_task"
       ],
-      "ui_commands": [
-        "open_task"
-      ],
+      "ui_commands": [],
       "expected_tools": [
         "explain_task"
       ],
-      "latency_ms": 2241,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "- Task **T-012** (Engine Mount Assembly) is in the plan with a status of **COMPLETED**.\n- It was originally planned to start at hour **-28** (22 Oct 18:00) and finished at hour **-16** (23 Oct 06:00).\n- It moved **0** hours compared to the original plan and incurred **0** late hours.\n- Its deadline was at hour **41** (25 Oct 15:00).\n- There were no binding constraints or blockers recorded for this",
+      "latency_ms": 18997,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "Task T-012, **Engine Mount Assembly**, is already marked as **COMPLETED**. It was finished as originally planned, with no movement from the initial schedule.",
       "notes": [],
       "pending": null
     },
@@ -293,15 +313,13 @@
       "tools_called": [
         "get_alerts"
       ],
-      "ui_commands": [
-        "navigate"
-      ],
+      "ui_commands": [],
       "expected_tools": [
         "get_alerts"
       ],
-      "latency_ms": 11936,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "There are currently no open critical alerts in the system.",
+      "latency_ms": 2379,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "There are no open critical alerts.",
       "notes": [],
       "pending": null
     },
@@ -309,26 +327,27 @@
       "id": "r10",
       "category": "read",
       "question": "How far along is stage 3?",
-      "passed": true,
-      "tool_ok": true,
+      "passed": false,
+      "tool_ok": false,
       "answer_ok": true,
       "grounded": true,
       "confirm_ok": null,
       "ui_ok": null,
-      "fell_back": false,
+      "fell_back": true,
       "tools_called": [
-        "get_stage_progress"
+        "Language Agent",
+        "Tracking Agent"
       ],
-      "ui_commands": [
-        "navigate"
-      ],
+      "ui_commands": [],
       "expected_tools": [
         "get_stage_progress"
       ],
-      "latency_ms": 13079,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "- Stage 3 \u2013 Upper Motor Stage is **48%** complete.\n- It has **3** tasks done and **1** task currently active out of **8** total tasks.\n- Projected launch readiness is **31 Oct 13:00** with **0** late hours.",
-      "notes": [],
+      "latency_ms": 1308,
+      "model": "Micro LM (offline fallback)",
+      "answer": "Assembly progress:\n\u2022 Stage 3 \u2013 Upper Motor Stage: 48% (3/8 tasks done, 1 running) \u2013 In Progress",
+      "notes": [
+        "expected one of ['get_stage_progress'], called ['Language Agent', 'Tracking Agent']"
+      ],
       "pending": null
     },
     {
@@ -350,9 +369,9 @@
         "get_deliveries",
         "get_plant_status"
       ],
-      "latency_ms": 15077,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "There are 12 deliveries currently on their way:\n- **DEL-001**: Fuel Pump (CMP-021), quantity 1, ETA 24 Oct 12:00 (in 14 hours)\n- **DEL-016**: Umbilical Interface Panel (CMP-080), quantity 2, ETA 24 Oct 18:00 (in 20 hours)\n- **DEL-017**: Vehicle Checkout Cable Set (CMP-081), quantity 1, ETA 24 Oct 23:00 (in 25 hours)\n- **DEL-004**: Attitude Thruster (CMP-048), quantity 4, ETA 25 Oct 00:00 (in 26 ho",
+      "latency_ms": 10547,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "There are 12 deliveries currently en route:\n\n- **Fuel Pump** (CMP-021, DEL-001): ETA 23 Oct 23:00\n- **Umbilical Interface Panel** (CMP-080, DEL-016): ETA 25 Oct 05:00\n- **Vehicle Checkout Cable Set** (CMP-081, DEL-017): ETA 25 Oct 10:00\n- **Attitude Thruster** (CMP-048, DEL-004): ETA 25 Oct 11:00\n- **Stacking Fastener Kit** (CMP-077, DEL-019): ETA 25 Oct 15:00\n- **Hydraulic Motor** (CMP-056, DEL-0",
       "notes": [],
       "pending": null
     },
@@ -374,9 +393,9 @@
       "expected_tools": [
         "get_task_readiness"
       ],
-      "latency_ms": 12685,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "Stage 2 is not ready to start assembly.\n- Task **T-013** (Turbopump & Engine Installation) is blocked by 2 issues.\n- **CMP-021** (Fuel Pump) is still on order and usable in ~22h.\n- No propulsion workstation is free, with the next one free in 4h.",
+      "latency_ms": 2368,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "Stage 2 is not currently ready for assembly. It is blocked by two issues on task **T-013**:\n\n- **CMP-021** (Fuel Pump) is still on order and will not be available for approximately 22 hours.\n- **WS-04** (Propulsion workstation) is occupied and will not be free for 4 hours.",
       "notes": [],
       "pending": null
     },
@@ -398,9 +417,9 @@
       "expected_tools": [
         "get_plant_status"
       ],
-      "latency_ms": 2410,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "- Plant time is **2026-10-23T22:00** with system status **ATTENTION** and **3** open alerts.\n- Stage progress: Stage 1 is **100%** (Completed), Stage 2 is **41%**, Stage 3 is **48%**, and Stage 4 is **0%**.\n- Inventory stands at **23** sufficient, **8** low, **8** critical, and **12** on order.\n- Component lots include **29** installed, **24** available, **9** in inspection, **5** in assembly, **1",
+      "latency_ms": 2357,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "The plant status is **ATTENTION** as of 2026-10-24 09:00.\n\n- Stage 1 is complete, while Stages 2 and 3 are in progress (41% and 48% respectively).\n- There are 3 open warnings, including a rejected Acceptance Seal Kit (CMP-072) and pending inspections.\n- Inventory has 8 critical items and 8 low-stock items.\n- There are 2 ongoing tasks, with 6 more planned in the next 24 hours.\n- Launch readiness is",
       "notes": [],
       "pending": null
     },
@@ -408,26 +427,27 @@
       "id": "r14",
       "category": "read",
       "question": "What is scheduled on WS-04?",
-      "passed": true,
-      "tool_ok": true,
+      "passed": false,
+      "tool_ok": false,
       "answer_ok": true,
       "grounded": true,
       "confirm_ok": null,
       "ui_ok": null,
-      "fell_back": false,
+      "fell_back": true,
       "tools_called": [
-        "get_schedule"
+        "Language Agent",
+        "Scheduling Agent"
       ],
-      "ui_commands": [
-        "navigate"
-      ],
+      "ui_commands": [],
       "expected_tools": [
         "get_schedule"
       ],
-      "latency_ms": 2150,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "Here are the tasks scheduled on WS-04:\n- **T-021** (Upper Motor Igniter & Safe-Arm Fit): Stage 3, currently **IN_PROGRESS**, started 23 Oct 20:00 and ends 24 Oct 02:00.\n- **T-013** (Turbopump & Engine Installation): Stage 2, **PENDING**, starts 24 Oct 20:00 and ends 25 Oct 10:00 (waiting on component CMP-021).\n- **T-022** (Attitude Control Thruster Fit): Stage 3, **PENDING**, starts 25 Oct 10:00 a",
-      "notes": [],
+      "latency_ms": 1340,
+      "model": "Micro LM (offline fallback)",
+      "answer": "Schedule \u2013 WS-04 (Propulsion Bay):\n\u2022 T-021 Upper Motor Igniter & Safe-Arm Fit \u2013 WS-04 \u2013 RUNNING, ends 24 Oct 13:00 (in 4h)\n\u2022 T-013 Turbopump & Engine Installation \u2013 WS-04 \u2013 starts 25 Oct 07:00 (in 22h)\n\u2022 T-022 Attitude Control Thruster Fit \u2013 WS-04 \u2013 starts 25 Oct 21:00 (in 36h)",
+      "notes": [
+        "expected one of ['get_schedule'], called ['Language Agent', 'Scheduling Agent']"
+      ],
       "pending": null
     },
     {
@@ -444,16 +464,14 @@
       "tools_called": [
         "get_component_history"
       ],
-      "ui_commands": [
-        "open_component"
-      ],
+      "ui_commands": [],
       "expected_tools": [
         "get_component_history",
         "get_component"
       ],
-      "latency_ms": 13442,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "- Ordered on 17 Oct 17:00 at hour -149 and received at Receiving Dock on 18 Oct 02:00.\n- Queued and inspected in the Inspection Lab, becoming approved on 19 Oct 14:00.\n- Moved to Central Warehouse on 20 Oct 04:00 and then to Assembly Bay on 20 Oct 21:00.\n- Installed in Stage 1 on 21 Oct 08:00 at hour -62.",
+      "latency_ms": 6562,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "CMP-007 (Igniter Assembly) has completed its lifecycle:\n- It was ordered on 18 Oct 04:00 and received on 18 Oct 13:00.\n- It cleared inspection on 20 Oct 01:00 and moved to the central warehouse.\n- It was moved to the assembly bay on 21 Oct 08:00.\n- It was successfully installed in the vehicle (Stage 1) on 21 Oct 19:00.",
       "notes": [],
       "pending": null
     },
@@ -471,17 +489,15 @@
       "tools_called": [
         "list_components"
       ],
-      "ui_commands": [
-        "navigate"
-      ],
+      "ui_commands": [],
       "expected_tools": [
         "list_components",
         "get_plant_status",
         "get_inventory"
       ],
-      "latency_ms": 2085,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "There are **3** component lots currently waiting in inspection:\n- **CMP-031** (Main Propellant Valve)\n- **CMP-055** (Avionics Bay Shell)\n- **CMP-066** (Antenna Assembly)",
+      "latency_ms": 2100,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "There are 3 component lots currently waiting for inspection:\n\n- **CMP-031**: Main Propellant Valve (Stage 2)\n- **CMP-055**: Avionics Bay Shell (Stage 4)\n- **CMP-066**: Antenna Assembly (Stage 4)",
       "notes": [],
       "pending": null
     },
@@ -504,9 +520,9 @@
         "get_live_mode",
         "get_plant_status"
       ],
-      "latency_ms": 1950,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "Live mode is currently **paused** (not running).\n- Speed is set to **4x** with a feed rate of **1 second per plant hour**.\n- Random disruptions are **enabled**.",
+      "latency_ms": 1767,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "Live mode is currently **paused**. Random disruptions are enabled, and the simulation is configured to run at a speed of 4x.",
       "notes": [],
       "pending": null
     },
@@ -524,15 +540,13 @@
       "tools_called": [
         "get_agent_messages"
       ],
-      "ui_commands": [
-        "navigate"
-      ],
+      "ui_commands": [],
       "expected_tools": [
         "get_agent_messages"
       ],
-      "latency_ms": 2430,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "The agent message bus currently has no recorded messages (`count: 0`). \n\n- This means no recent communications between the agents are available to display.",
+      "latency_ms": 2316,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "There are no recent agent messages recorded.",
       "notes": [],
       "pending": null
     },
@@ -550,17 +564,15 @@
       "tools_called": [
         "get_schedule"
       ],
-      "ui_commands": [
-        "navigate"
-      ],
+      "ui_commands": [],
       "expected_tools": [
         "get_plant_status",
         "get_stage_progress",
         "get_schedule"
       ],
-      "latency_ms": 22484,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "The Launch Readiness Review (**T-039**) is scheduled to start at **31 Oct 07:00** (in 177 hours) and finish at **31 Oct 13:00** (in 183 hours).\n- It takes place at workstation **WS-01** in stage 4.\n- It is waiting for its predecessor **T-038** (Final Integrated Vehicle Test) to finish.",
+      "latency_ms": 2180,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "The **Launch Readiness Review (T-039)** is scheduled to start on **31 Oct 18:00** and finish on **01 Nov 00:00**. This reflects the current plan, assuming the predecessor task (T-038) completes as scheduled at +177 hours.",
       "notes": [],
       "pending": null
     },
@@ -576,6 +588,7 @@
       "ui_ok": null,
       "fell_back": false,
       "tools_called": [
+        "get_inventory",
         "get_shortages"
       ],
       "ui_commands": [],
@@ -584,9 +597,9 @@
         "get_delayed_tasks",
         "get_inventory"
       ],
-      "latency_ms": 2268,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "Based on the current inventory shortages, each component listed is blocking exactly **1 task**:\n\n- **CMP-031** (Main Propellant Valve) blocks **T-014 Fuel Line Connection**\n- **CMP-082** (Range Safety Receiver) blocks **T-037 Integrated Vehicle Electrical Check**\n- **CMP-021** (Fuel Pump) blocks **T-013 Turbopump & Engine Installation**\n- **CMP-034** (Avionics Unit) blocks **T-028 Flight Computer ",
+      "latency_ms": 3793,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "Multiple components are causing critical shortages, each affecting exactly one task. There isn't a single component blocking more tasks than the others.\n\nThe following critical components are currently blocking tasks:\n- **Main Propellant Valve (CMP-031)**: blocks T-014 Fuel Line Connection\n- **Range Safety Receiver (CMP-082)**: blocks T-037 Integrated Vehicle Electrical Check\n- **Fuel Pump (CMP-02",
       "notes": [],
       "pending": null
     },
@@ -604,15 +617,13 @@
       "tools_called": [
         "get_component"
       ],
-      "ui_commands": [
-        "open_component"
-      ],
+      "ui_commands": [],
       "expected_tools": [
         "get_component"
       ],
-      "latency_ms": 2045,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "- Component CMP-021 (Fuel Pump) is currently **In transit (supplier)**.\n- Its lifecycle status is **ORDERED** with a delivery ETA of **24 Oct 12:00** (in 14 hours).\n- Inspection status is **PENDING**, quantity on hand is **0** (required: 1), and it is assigned to stage 2 for task **T-013** (Turbopump & Engine Installation).",
+      "latency_ms": 2684,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "CMP-021 (Fuel Pump) is currently **in transit** from the supplier, Orbital Forge Industries. It is expected to arrive on 24 Oct at 23:00 (in 14 hours). It is currently ordered and pending inspection for stage 2 task T-013.",
       "notes": [],
       "pending": null
     },
@@ -634,9 +645,9 @@
       "expected_tools": [
         "get_supplier"
       ],
-      "latency_ms": 12497,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "- Supplier is **Orbital Forge Industries**.\n- Reliability is **0.93** with a lead time of **6 days**.\n- There is 1 open delivery (**DEL-001**) for quantity 1, currently **ON_TIME** with ETA **24 Oct 12:00**.",
+      "latency_ms": 23601,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "The supplier for CMP-021 is **Orbital Forge Industries**. They have a reliability rating of **0.93** and a typical lead time of **6 days**. Currently, they have one open delivery (DEL-001) for this component, which is on schedule.",
       "notes": [],
       "pending": null
     },
@@ -658,9 +669,9 @@
       "expected_tools": [
         "get_task_readiness"
       ],
-      "latency_ms": 10836,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "Stage 2 is not ready yet.\n- It has 2 blocking issues on 1 eligible task (T-013, Turbopump & Engine Installation).\n- Component CMP-021 (Fuel Pump) is still on order and usable in ~22h.\n- There is no propulsion workstation free; the next one is free in 4h.",
+      "latency_ms": 14477,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "Stage 2 is not currently ready. There are 2 issues blocking \"Turbopump & Engine Installation\" (T-013):\n\n- The **CMP-021 Fuel Pump** is still on order and will not be available for approximately 22 hours.\n- The **PROPULSION** workstation is occupied; the next available slot is in 4 hours.",
       "notes": [],
       "pending": null
     },
@@ -668,26 +679,26 @@
       "id": "f04",
       "category": "follow_up",
       "question": "What is blocking it?",
-      "passed": true,
-      "tool_ok": true,
+      "passed": false,
+      "tool_ok": false,
       "answer_ok": true,
       "grounded": true,
       "confirm_ok": null,
       "ui_ok": null,
       "fell_back": false,
-      "tools_called": [
-        "get_task_readiness"
-      ],
+      "tools_called": [],
       "ui_commands": [],
       "expected_tools": [
         "get_task_readiness",
         "get_shortages",
         "explain_task"
       ],
-      "latency_ms": 2356,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "Stage 2 is blocked by two issues on task T-013 (Turbopump & Engine Installation):\n- **CMP-021** (Fuel Pump) is still on order and will be usable in ~22h.\n- There is no propulsion workstation free, with the next one free in 4h.",
-      "notes": [],
+      "latency_ms": 1386,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "The task \"Turbopump & Engine Installation\" (T-013) is blocked by two factors:\n\n- **Component Shortage:** The **CMP-021** Fuel Pump is currently on order and expected to be available in 22 hours.\n- **Workstation Availability:** The **PROPULSION** workstation is unavailable and will not be free for 4 hours.",
+      "notes": [
+        "expected one of ['get_task_readiness', 'get_shortages', 'explain_task'], called nothing"
+      ],
       "pending": null
     },
     {
@@ -702,20 +713,15 @@
       "ui_ok": null,
       "fell_back": false,
       "tools_called": [
-        "get_alerts",
-        "show_dashboard"
+        "get_alerts"
       ],
-      "ui_commands": [
-        "navigate",
-        "navigate"
-      ],
+      "ui_commands": [],
       "expected_tools": [
-        "get_alerts",
-        "show_dashboard"
+        "get_alerts"
       ],
-      "latency_ms": 20399,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "There are no open alerts for stage 3.",
+      "latency_ms": 2737,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "There are currently no open alerts for stage 3.",
       "notes": [],
       "pending": null
     },
@@ -733,16 +739,14 @@
       "tools_called": [
         "get_alerts"
       ],
-      "ui_commands": [
-        "navigate"
-      ],
+      "ui_commands": [],
       "expected_tools": [
         "get_alerts",
         "show_dashboard"
       ],
-      "latency_ms": 2506,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "There are no critical open alerts across the plant.",
+      "latency_ms": 6078,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "There are no critical alerts currently open.",
       "notes": [],
       "pending": null
     },
@@ -758,20 +762,17 @@
       "ui_ok": true,
       "fell_back": false,
       "tools_called": [
-        "get_component",
         "show_dashboard"
       ],
       "ui_commands": [
-        "open_component",
         "navigate"
       ],
       "expected_tools": [
-        "show_dashboard",
-        "get_component"
+        "show_dashboard"
       ],
-      "latency_ms": 2265,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "- **CMP-021** (Fuel Pump) is currently **ORDERED** and in stage 2.\n- Status is **PENDING** inspection with 0 on hand and 1 required.\n- Current location is **In transit (supplier)** via **Orbital Forge Industries** (delivery **DEL-001**).\n- Estimated arrival is **24 Oct 12:00** (in 14 hours).\n- It is used by task **T-013** (Turbopump & Engine Installation).",
+      "latency_ms": 2167,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "OK. I have opened the dashboard page for component CMP-021.",
       "notes": [],
       "pending": null
     },
@@ -793,12 +794,11 @@
         "navigate"
       ],
       "expected_tools": [
-        "show_dashboard",
-        "get_schedule"
+        "show_dashboard"
       ],
-      "latency_ms": 2336,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "Opening the schedule page for you now.",
+      "latency_ms": 2555,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "OK. I have opened the schedule page for you.",
       "notes": [],
       "pending": null
     },
@@ -806,27 +806,29 @@
       "id": "u03",
       "category": "ui",
       "question": "Show me the reports.",
-      "passed": true,
-      "tool_ok": true,
+      "passed": false,
+      "tool_ok": false,
       "answer_ok": true,
       "grounded": true,
       "confirm_ok": null,
       "ui_ok": true,
-      "fell_back": false,
+      "fell_back": true,
       "tools_called": [
-        "show_dashboard"
+        "Language Agent",
+        "Scheduling Agent"
       ],
       "ui_commands": [
         "navigate"
       ],
       "expected_tools": [
-        "show_dashboard",
-        "compare_schedulers"
+        "show_dashboard"
       ],
-      "latency_ms": 2217,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "I have opened the reports page on your dashboard.",
-      "notes": [],
+      "latency_ms": 1291,
+      "model": "Micro LM (offline fallback)",
+      "answer": "Schedule \u2013 Today / next 24 hours:\n\u2022 T-011 Stage 2 Tank Integration \u2013 WS-02 \u2013 RUNNING, ends 24 Oct 17:00 (in 8h)\n\u2022 T-021 Upper Motor Igniter & Safe-Arm Fit \u2013 WS-04 \u2013 RUNNING, ends 24 Oct 13:00 (in 4h)\n\u2022 T-023 Stage 3 Avionics Harness \u2013 WS-05 \u2013 starts 24 Oct 09:00 (now)\n\u2022 T-015 Stage 2 Avionics System Check \u2013 WS-05 \u2013 starts 24 Oct 17:00 (in 8h)\n\u2022 T-026 Avionics Bay Component Inspection \u2013 WS-01 \u2013 sta",
+      "notes": [
+        "expected one of ['show_dashboard'], called ['Language Agent', 'Scheduling Agent']"
+      ],
       "pending": null
     },
     {
@@ -847,9 +849,9 @@
       "expected_tools": [
         "delay_delivery"
       ],
-      "latency_ms": 2277,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "A delivery delay of 24 hours has been registered for component **CMP-021** (Fuel Pump). \nThis action requires your confirmation before it is applied, which will trigger a re-plan of the assembly schedule. Please press **Confirm** to proceed.",
+      "latency_ms": 21590,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "I am ready to delay the delivery of **CMP-021** (Fuel Pump) by **24** hours. This action will trigger a full schedule re-plan. Please confirm if you would like to proceed with this change.",
       "notes": [],
       "pending": "Delay CMP-021's delivery by 24h. This re-plans the whole schedule."
     },
@@ -871,11 +873,11 @@
       "expected_tools": [
         "reject_component"
       ],
-      "latency_ms": 12307,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "Component lot **CMP-005** (Nozzle Throat Insert) is in inspection and needs to be rejected.\nRejecting it will quarantine the lot, order a replacement with a 48-hour lead time, and re-plan the assembly schedule.\nPlease **Confirm** this action to proceed.",
+      "latency_ms": 2318,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "Component **CMP-005** has failed inspection. I can reject it and order a replacement with a 24-hour lead time, which will trigger a total schedule re-plan. Please confirm if you would like me to proceed with this action.",
       "notes": [],
-      "pending": "Reject CMP-005 in inspection and order a replacement (+48h). This re-plans the whole schedule."
+      "pending": "Reject CMP-005 in inspection and order a replacement (+24h). This re-plans the whole schedule."
     },
     {
       "id": "a03",
@@ -895,9 +897,9 @@
       "expected_tools": [
         "workstation_down"
       ],
-      "latency_ms": 1809,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "Workstation **WS-04** is scheduled to go out of service for 12 hours, which will trigger a complete schedule re-plan.\nNothing has changed yet. Please press **Confirm** to execute this downtime.",
+      "latency_ms": 11540,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "I have initiated the request to take workstation **WS-04** out of service for 12 hours. This will trigger a full re-plan of the assembly schedule.\n\nPlease confirm that you would like to proceed with this action.",
       "notes": [],
       "pending": "Take WS-04 out of service for 12h. This re-plans the whole schedule."
     },
@@ -905,25 +907,29 @@
       "id": "a04",
       "category": "action",
       "question": "Re-plan the schedule with the genetic algorithm.",
-      "passed": true,
-      "tool_ok": true,
+      "passed": false,
+      "tool_ok": false,
       "answer_ok": true,
       "grounded": true,
-      "confirm_ok": true,
+      "confirm_ok": false,
       "ui_ok": null,
-      "fell_back": false,
+      "fell_back": true,
       "tools_called": [
-        "replan_schedule"
+        "Language Agent",
+        "Scheduling Agent"
       ],
       "ui_commands": [],
       "expected_tools": [
         "replan_schedule"
       ],
-      "latency_ms": 9510,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "I am ready to re-plan the assembly schedule using the genetic algorithm (**GA**). \n\n- Action: Re-plan the entire schedule with GA and make it the active plan.\n- Status: **Confirmation required**.\n\nPlease press Confirm to proceed with this re-planning.",
-      "notes": [],
-      "pending": "Re-plan the whole schedule with GA and make it the active plan."
+      "latency_ms": 1438,
+      "model": "Micro LM (offline fallback)",
+      "answer": "Schedule re-optimised with OR-Tools CP-SAT: makespan 183h, 0 task(s) projected late, 0 task(s) moved.",
+      "notes": [
+        "expected one of ['replan_schedule'], called ['Language Agent', 'Scheduling Agent']",
+        "an action ran (or was skipped) without asking for confirmation"
+      ],
+      "pending": null
     },
     {
       "id": "a05",
@@ -943,9 +949,9 @@
       "expected_tools": [
         "advance_time"
       ],
-      "latency_ms": 16312,
+      "latency_ms": 28452,
       "model": "gemini-3.1-flash-lite",
-      "answer": "The simulation is ready to move forward by 12 hours. This will advance deliveries, inspections, and task progress. Please confirm this action to proceed.",
+      "answer": "The simulation advance by 12 hours is ready, but requires confirmation. This action will progress deliveries, inspections, and tasks according to the current schedule. Please confirm if you would like to proceed.",
       "notes": [],
       "pending": "Advance the simulation clock by 12h. Deliveries, inspections and tasks will progress."
     },
@@ -967,9 +973,9 @@
       "expected_tools": [
         "control_live_mode"
       ],
-      "latency_ms": 16091,
+      "latency_ms": 3462,
       "model": "gemini-3.1-flash-lite",
-      "answer": "Live mode is now running at 2x speed with random events enabled.",
+      "answer": "Live mode is now running at 2x speed, with random events enabled.",
       "notes": [],
       "pending": null
     },
@@ -991,9 +997,9 @@
       "expected_tools": [
         "control_live_mode"
       ],
-      "latency_ms": 27667,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "- The live simulation has been paused.\n- The running state is now false, with random disruptions left at true and speed set to 2.",
+      "latency_ms": 2548,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "The simulation is now paused.",
       "notes": [],
       "pending": null
     },
@@ -1011,15 +1017,13 @@
       "tools_called": [
         "compare_schedulers"
       ],
-      "ui_commands": [
-        "navigate"
-      ],
+      "ui_commands": [],
       "expected_tools": [
         "compare_schedulers"
       ],
-      "latency_ms": 10431,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "- **FCFS**: Makespan 183, objective 183, 0 tardy tasks, 0.2 ms runtime.\n- **PRIORITY**: Makespan 183, objective 183, 0 tardy tasks, 0.2 ms runtime.\n- **GA**: Makespan 183, objective 183, 0 tardy tasks, 678.8 ms runtime.\n- **CPSAT**: Makespan 183, objective 183, 0 tardy tasks, 12.9 ms runtime, marked optimal.",
+      "latency_ms": 4070,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "All four scheduling algorithms resulted in the same makespan of 183 and objective score of 183, with no tardy tasks.\n\n- **CPSAT** is identified as the optimal algorithm.\n- **FCFS** and **PRIORITY** were the fastest to run at 0.3 ms.\n- **GA** was the slowest at 1282.1 ms.\n- All algorithms show identical performance metrics for the current plant state.",
       "notes": [],
       "pending": null
     },
@@ -1037,15 +1041,13 @@
       "tools_called": [
         "get_component"
       ],
-      "ui_commands": [
-        "open_component"
-      ],
+      "ui_commands": [],
       "expected_tools": [
         "get_component"
       ],
-      "latency_ms": 2309,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "Component **CMP-021** (Fuel Pump) has a status of **ORDERED** and is currently located **In transit (supplier)**.\n- It is supplied by **Orbital Forge Industries** via delivery **DEL-001**.\n- The estimated arrival is **24 Oct 12:00** (in 14 hours).\n- Its inspection status is **PENDING**, with 0 on hand out of 1 required for stage 2 task **T-013** (Turbopump & Engine Installation).",
+      "latency_ms": 2798,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "CMP-021 (Fuel Pump) is currently **in transit** from the supplier, Orbital Forge Industries. It is expected to arrive on 24 Oct at 23:00 (in 14 hours) and is in ORDERED status. It is required for T-013 (Turbopump & Engine Installation).",
       "notes": [],
       "pending": null
     },
@@ -1062,21 +1064,17 @@
       "fell_back": false,
       "tools_called": [
         "get_stage_progress",
-        "get_task_readiness",
-        "get_alerts"
+        "get_task_readiness"
       ],
-      "ui_commands": [
-        "navigate",
-        "navigate"
-      ],
+      "ui_commands": [],
       "expected_tools": [
         "get_stage_progress",
         "get_task_readiness",
         "get_plant_status"
       ],
-      "latency_ms": 2293,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "- Stage 2 (Liquid Core Stage) is **41%** complete with 3 tasks done and 1 active out of 9 total.\n- The stage is currently not ready to proceed due to 2 blocking issues on task **T-013**.\n- **CMP-021** (Fuel Pump) is still on order and will be usable in ~22h.\n- No propulsion workstation is free; the next free workstation is in 4h.\n- Projected launch-readiness is **31 Oct 13:00** (0 hours late).\n- T",
+      "latency_ms": 8662,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "Stage 2 is 41% complete, with 3 of 9 tasks finished. It is currently not ready to proceed.\n\nThe task **Turbopump & Engine Installation** (T-013) is blocked by:\n- **CMP-021** (Fuel Pump): Still on order, will be usable in ~22 hours.\n- **Workstation**: No propulsion workstation is free; the next one becomes available in 4 hours.",
       "notes": [],
       "pending": null
     },
@@ -1092,18 +1090,17 @@
       "ui_ok": null,
       "fell_back": false,
       "tools_called": [
-        "get_alerts"
+        "get_alerts",
+        "get_shortages"
       ],
-      "ui_commands": [
-        "navigate"
-      ],
+      "ui_commands": [],
       "expected_tools": [
         "get_alerts",
         "get_plant_status"
       ],
-      "latency_ms": 10373,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "- There are no critical alerts or active fires in the plant.\n- There are 3 open warning alerts: a scheduled maintenance at Avionics Lab (WS-05) on 26 Oct 02:00, 6 components with inspection pending, and CMP-072 (Stage 4 Acceptance Seal Kit) rejected in inspection with a replacement ETA of 25 Oct 14:00.",
+      "latency_ms": 12255,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "There are no critical alerts, so nothing is literally on fire.\n\nRegarding the **Hot-Fire Instrumentation Kit (CMP-037)**:\n- It is currently in a status of **INSPECTION_PENDING**.\n- We are short 1 unit of this component.\n- It is not currently flagged as delayed.",
       "notes": [],
       "pending": null
     },
@@ -1125,9 +1122,9 @@
       "expected_tools": [
         "get_component"
       ],
-      "latency_ms": 1970,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "No component matches **CMP-999**. Component ids follow formats like **CMP-021**, and **CMP-999** does not exist in the assembly line.",
+      "latency_ms": 5393,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "I could not find a component with the ID CMP-999. Please check the ID and try again, or I can list the components currently in the system if that would be helpful.",
       "notes": [],
       "pending": null
     },
@@ -1145,13 +1142,11 @@
       "tools_called": [
         "get_component"
       ],
-      "ui_commands": [
-        "open_component"
-      ],
+      "ui_commands": [],
       "expected_tools": [],
-      "latency_ms": 2207,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "A warehouse, depot, or location named Mumbai does not exist in the assembly line data. \n\nFor component CMP-021 (Fuel Pump):\n- Quantity on hand is 0 units.\n- Quantity required is 1 unit.\n- Current location is In transit (supplier).",
+      "latency_ms": 11346,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "There is no information regarding a \"Mumbai depot\" in the plant records.\n\nRegarding **CMP-021** (Fuel Pump):\n- It is currently **ORDERED** and in transit from **Orbital Forge Industries**.\n- The quantity on hand is **0**.\n- The expected delivery is **24 Oct 23:00** (in 14 hours).",
       "notes": [],
       "pending": null
     },
@@ -1167,20 +1162,15 @@
       "ui_ok": null,
       "fell_back": false,
       "tools_called": [
-        "get_alerts",
-        "get_supplier",
-        "list_components"
+        "get_supplier"
       ],
-      "ui_commands": [
-        "navigate",
-        "navigate"
-      ],
+      "ui_commands": [],
       "expected_tools": [
         "get_supplier"
       ],
-      "latency_ms": 22964,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "The available plant data does not contain supplier on-time records or quarterly metrics. \n\nI can help you with:\n- Checking component locations and lifecycle statuses (e.g., `CMP-021`).\n- Viewing open alerts and assembly task readiness.\n- Inspecting the current assembly schedule and delayed tasks.",
+      "latency_ms": 11070,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "Based on the reliability ratings provided, **Cryon Valve Systems (SUP-06)** currently has the lowest on-time record at 0.84.",
       "notes": [],
       "pending": null
     },
@@ -1198,9 +1188,9 @@
       "tools_called": [],
       "ui_commands": [],
       "expected_tools": [],
-      "latency_ms": 6868,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "That is outside what you cover. I can check component statuses, track assembly stages, view the schedule, or manage deliveries for the launch-vehicle assembly line.",
+      "latency_ms": 5533,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "That question is outside of what I cover. My capabilities are focused on the assembly line, including managing components, tracking tasks, monitoring schedules, and handling supplier deliveries. I can provide status updates, explain task delays, and simulate plant disruptions.",
       "notes": [],
       "pending": null
     },
@@ -1218,9 +1208,9 @@
       "tools_called": [],
       "ui_commands": [],
       "expected_tools": [],
-      "latency_ms": 1248,
-      "model": "gemini-3.5-flash-lite",
-      "answer": "That is outside what I cover on this launch-vehicle assembly line. I can check component statuses, inspect inventory shortages, review the assembly schedule, or manage simulated plant disruptions.",
+      "latency_ms": 3790,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "I am the assembly line assistant for a launch-vehicle manufacturing plant and cannot provide programming assistance.\n\nI can help you monitor vehicle assembly stages, component inventory, supplier deliveries, workstation status, and scheduling. If you need a status update or have questions about the assembly progress, please let me know.",
       "notes": [],
       "pending": null
     },
@@ -1228,25 +1218,20 @@
       "id": "o03",
       "category": "off_topic",
       "question": "What do you think about the real ISRO launch schedule?",
-      "passed": false,
+      "passed": true,
       "tool_ok": null,
-      "answer_ok": false,
+      "answer_ok": true,
       "grounded": true,
       "confirm_ok": null,
       "ui_ok": null,
-      "fell_back": true,
-      "tools_called": [
-        "Language Agent"
-      ],
+      "fell_back": false,
+      "tools_called": [],
       "ui_commands": [],
       "expected_tools": [],
-      "latency_ms": 1359,
-      "model": "Micro LM (offline fallback)",
-      "answer": "Nothing has been delayed relative to the original plan, so there is nothing to explain.",
-      "notes": [
-        "called ['Language Agent'] for an off-topic question",
-        "did not deflect an off-topic question"
-      ],
+      "latency_ms": 4271,
+      "model": "gemini-3.1-flash-lite",
+      "answer": "I am only able to provide information and assistance regarding the assembly line for this specific launch vehicle, including its current inventory, schedule, and component status. I do not have information about real-world agencies like ISRO.\n\nIf you have questions about this plant, I can help you with things like checking component availability, investigating task delays, or managing the producti",
+      "notes": [],
       "pending": null
     }
   ]

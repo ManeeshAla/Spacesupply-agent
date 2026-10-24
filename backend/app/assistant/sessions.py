@@ -23,6 +23,32 @@ from ..config import CONFIRM_ACTIONS  # noqa: E402
 settings: dict = {"confirm": CONFIRM_ACTIONS}
 
 
+# Tool output per session. The grounding guard needs it: on a follow-up the model may
+# legitimately restate a fact an earlier turn looked up, and judging that turn against only
+# its own (possibly empty) tool output would reject a correct answer as invented.
+_sources: dict[str, list[str]] = {}
+MAX_SOURCES = 24
+
+
+def remember_sources(session_id: str, chunks: list[str]) -> None:
+    if not chunks:
+        return
+    with _lock:
+        buf = _sources.setdefault(session_id, [])
+        buf.extend(chunks)
+        del buf[:-MAX_SOURCES]
+
+
+def known_sources(session_id: str) -> str:
+    with _lock:
+        return "\n".join(_sources.get(session_id, ()))
+
+
+def forget_sources(session_id: str | None = None) -> None:
+    with _lock:
+        _sources.pop(session_id, None) if session_id else _sources.clear()
+
+
 def put(session_id: str, action: dict) -> dict:
     """Store an action awaiting confirmation. Returns the stored record."""
     rec = {**action, "session_id": session_id, "created": time.time(), "status": "PENDING"}
@@ -51,6 +77,7 @@ def peek(action_id: str) -> dict | None:
 def clear() -> None:
     with _lock:
         _pending.clear()
+        _sources.clear()
 
 
 def count() -> int:

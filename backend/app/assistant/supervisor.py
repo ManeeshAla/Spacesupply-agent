@@ -44,10 +44,15 @@ vehicle or metric that does not exist here - say that it does not exist before g
 do have. Never quietly answer a different question from the one asked.
 - Ids look like CMP-021 (component lot), T-012 (task), WS-04 (workstation), DEL-007 \
 (delivery), SUP-02 (supplier). Stages are 1-4. All times are simulated plant time.
+- On a follow-up ("and its supplier?", "what is blocking it?") work out what "it" refers to from the conversation and call the tool again for fresh data. Do not answer from what you said earlier - the plant changes between turns.
 - For broad questions ("how are things?") call get_plant_status. For anything about one \
 component, task, stage, supplier or alert, call the specific tool.
-- When the user says "show me", "open" or "take me to", also call show_dashboard so their \
-screen follows the conversation.
+- show_dashboard moves the user's screen away from this chat, which hides the answer you just \
+gave. Call it ONLY when the request is about the screen itself: "take me to the alerts page", \
+"open CMP-021", "go to reports". A request for DATA - "where is X", "what is delayed", "how is \
+inventory", "is stage 2 ready", and also "show me the schedule for today" - is answered here \
+in the chat: look it up and reply, and do NOT call show_dashboard. Never call it merely \
+because you used a read tool.
 
 ACTIONS
 - delay_delivery, reject_component, workstation_down, replan_schedule and advance_time change \
@@ -274,9 +279,16 @@ def _default_factory(name: str):
     return gemini.make_model(name)
 
 
-def _finalise(ctx: ToolCtx, query: str, answer: str) -> tuple[str, list[str]]:
-    """Apply the grounding guard. Returns (final_answer, ungrounded_tokens)."""
-    sources = "\n".join(ctx.sources) + "\n" + query
+def _finalise(ctx: ToolCtx, query: str, answer: str, session_id: str = "") -> tuple[str, list[str]]:
+    """Apply the grounding guard. Returns (final_answer, ungrounded_tokens).
+
+    Sources are this turn's tool output plus whatever earlier turns in the same conversation
+    looked up, so a follow-up that restates an already-established fact is not mistaken for
+    invention and thrown away.
+    """
+    from . import sessions
+    sessions.remember_sources(session_id, ctx.sources)
+    sources = "\n".join(ctx.sources) + "\n" + sessions.known_sources(session_id) + "\n" + query
     bad = llm.ungrounded_facts(answer, sources)
     if not bad:
         return answer, []
@@ -418,7 +430,7 @@ async def astream(ctx: ToolCtx, query: str, session_id: str,
             yield ev
         return
 
-    final, bad = _finalise(ctx, query, answer)
+    final, bad = _finalise(ctx, query, answer, session_id)
     if bad:
         yield {"type": "replace", "text": final, "ungrounded": bad}
     yield {"type": "done", "source": "gemini", "model": ctx.model_used, "answer": final,

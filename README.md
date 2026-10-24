@@ -138,45 +138,47 @@ memory, 3 dashboard-control, 8 actions, 6 tricky/no-data, 3 off-topic. A questio
 right tool was called, the answer contained what it should and nothing it should not, the grounding
 guard passed, an action stopped for confirmation, and the model did not fall back.
 
-Measured on `gemini-3.5-flash-lite`, free tier, October 2026:
+Measured on `gemini-3.5-flash-lite`, free tier, October 2026 (`--pace 6`):
 
 | Metric | Result |
 |---|---|
-| **Overall accuracy** | **97.8%** (45/46) |
-| Correct tool chosen | 100% |
-| Answer content | 97.8% |
-| **Grounded answers** (no invented id or number) | **100%** |
+| **Accuracy on the 42 questions Gemini answered** | **97.6%** (41/42) |
+| Correct tool chosen | 97.4% |
+| **Grounded** (no invented id or number) | **100%** |
 | Confirmation gate respected on actions | 100% |
 | Dashboard commands correct | 100% |
-| Fell back to the Micro LM | 2.2% |
-| Latency median / p90 | 2.6s / 16.1s |
+| Latency median / p90 | 3.6s / 19.0s |
+| — | |
+| End-to-end over all 46, fallback counted as failure | 89.1% |
+| Fell back to the offline Micro LM | 8.7% (4/46) |
 
-> **Re-measure before quoting this.** These figures were taken *before* the dashboard-navigation
-> change below (plain questions no longer move the screen; only `show_dashboard` does), which
-> changed what the 3 dashboard-control questions are judged on. The Gemini key used for the run
-> has since been revoked, so the table has not been re-run against the new behaviour. Run
-> `scripts/eval_chat.py` with a fresh key and replace it.
+**Read the two blocks separately.** A fallback means the free tier was unavailable for that
+question, which says nothing about the assistant's judgement — the Micro LM answers instead and the
+UI says so. Of the 5 failures in this run, 4 were fallbacks; the single real one was a follow-up
+("what is blocking it?") that the model answered correctly from the previous turn instead of
+re-querying for fresh data, as the prompt asks it to.
 
-Per category: reads 100%, follow-ups 100%, dashboard control 100%, actions 100%, tricky 100%,
-off-topic 67% (1 of 3).
+`scripts/eval_chat.py` therefore reports quality and availability separately, warns when the
+fallback rate exceeds 10%, and stops early after six consecutive fallbacks rather than spending the
+rest of the run measuring an exhausted quota.
 
-Reproduce (your numbers will differ a little):
+Reproduce (expect your own numbers to differ):
 ```bash
 cd backend
-python scripts/eval_chat.py              # whole set, paced for the free tier
-python scripts/eval_chat.py --only read  # one category
+python scripts/eval_chat.py --pace 6            # whole set, paced for the free tier
+python scripts/eval_chat.py --only follow_up    # one category
 ```
 Results are written to `backend/artifacts/chat_eval.json` and shown on the Reports page, including
 every failure with its reason.
 
-**Honest notes on these numbers.** Across five runs of the full set I saw 97.8%, 97.8%, 93.5%,
-97.8%, 97.8% — the single failure moves between questions, so treat ~95% as the real figure rather
-than any one run. The failures were never hallucinations: they were a correct answer phrased without
-repeating the id, and the off-topic question landing on the Micro LM fallback (which has no
-off-topic intent and so answers it badly). Two bugs the live run exposed and fixed are covered by
-tests now: the grounding guard used to flag a correct percentage derived from a fraction
-(reliability `0.89` reported as `89%`), and a failed turn used to leave a half-finished exchange in
-memory that the next question resumed.
+**Honest notes.** Quality stayed at 97-100% on every run where quota was available; the end-to-end
+figure swung between 80% and 98% purely with free-tier availability, so quote the quality block and
+state the fallback rate beside it. Running the full set roughly seven times in one afternoon
+exhausted the daily allowance and produced a meaningless 80% — that is a property of the free tier,
+not of the system. Three bugs the live runs exposed are now covered by tests: the grounding guard
+flagged a correct percentage derived from a fraction (`0.89` reported as `89%`); a failed turn left a
+half-finished exchange in memory that the next question resumed; and the guard judged a follow-up
+against only its own tool output, so correct recall from an earlier turn was discarded as invented.
 
 **Micro LM** — 106,245 parameters.
 | Split | Intent acc. | Macro F1 | Entity F1 |

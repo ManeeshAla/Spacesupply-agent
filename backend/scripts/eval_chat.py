@@ -163,6 +163,19 @@ def main() -> int:
         if out.get("error"):
             rec["notes"].append(out["error"])
         results.append(rec)
+        # a fallback is an availability event, not a wrong answer; once the free tier is
+        # exhausted every remaining question would score the Micro LM instead of Gemini
+        streak = 0
+        for r in reversed(results):
+            if r["fell_back"]:
+                streak += 1
+            else:
+                break
+        if streak >= 6:
+            print(f"\n  stopping: {streak} questions in a row fell back to the Micro LM - the "
+                  f"free-tier quota\n  looks exhausted. Re-run later; results so far are kept.",
+                  flush=True)
+            break
         print(f"          {'PASS' if rec['passed'] else 'FAIL'}"
               + (f"  ({'; '.join(rec['notes'])[:110]})" if rec["notes"] else ""), flush=True)
         if i < len(questions):
@@ -173,6 +186,7 @@ def main() -> int:
         vals = [r[key] for r in rows if r[key] is not None]
         return round(100 * sum(1 for v in vals if v) / len(vals), 1) if vals else None
 
+    answered = [r for r in results if not r["fell_back"]]      # questions Gemini actually handled
     lat = [r["latency_ms"] for r in results if r["latency_ms"]]
     by_cat: dict[str, dict] = {}
     for cat in sorted({r["category"] for r in results}):
@@ -184,6 +198,14 @@ def main() -> int:
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "model": gemini.GEMINI_MODEL, "fallback_model": gemini.GEMINI_FALLBACK_MODEL,
         "questions": len(results), "duration_s": round(time.time() - started, 1),
+        "answered": len(answered),
+        "quality": {
+            # the headline: how good the assistant is on the questions it answered. A fallback
+            # means the API was unavailable, which says nothing about its judgement.
+            "accuracy": rate(answered, "passed"),
+            "tool_choice_accuracy": rate(answered, "tool_ok"),
+            "grounded": rate(answered, "grounded"),
+        },
         "overall": {
             "accuracy": rate(results, "passed"),
             "tool_choice_accuracy": rate(results, "tool_ok"),
@@ -203,9 +225,14 @@ def main() -> int:
     out_path = pathlib.Path(args.out) if args.out else CHAT_EVAL_PATH
     out_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
 
-    o = report["overall"]
+    o, qy = report["overall"], report["quality"]
     print("\n" + "=" * 62)
     print(f"  {report['questions']} questions in {report['duration_s']}s on {report['model']}")
+    print(f"  QUALITY - the {report['answered']} question(s) Gemini actually answered")
+    print(f"    accuracy            {qy['accuracy']}%")
+    print(f"    tool choice         {qy['tool_choice_accuracy']}%")
+    print(f"    grounded            {qy['grounded']}%")
+    print(f"  END TO END - all {report['questions']}, a fallback counted as a failure")
     print(f"  overall accuracy      {o['accuracy']}%")
     print(f"  tool choice           {o['tool_choice_accuracy']}%")
     print(f"  answer content        {o['answer_accuracy']}%")
@@ -214,6 +241,10 @@ def main() -> int:
     print(f"  ui commands           {o['ui_command_accuracy']}%")
     print(f"  fell back to Micro LM {o['fallback_rate']}%")
     print(f"  latency median/p90    {o['latency_ms_median']}ms / {o['latency_ms_p90']}ms")
+    if o["fallback_rate"] > 10:
+        print(f"  !! {o['fallback_rate']}% of questions fell back to the offline Micro LM, so the\n"
+              f"     end-to-end number mostly measures free-tier availability, not the assistant.\n"
+              f"     Quote the QUALITY block, or re-run when the quota has reset.")
     print("=" * 62)
     for cat, v in by_cat.items():
         print(f"  {cat:10s} n={v['n']:<3d} accuracy {v['accuracy']}%  tool choice {v['tool_choice']}%")
