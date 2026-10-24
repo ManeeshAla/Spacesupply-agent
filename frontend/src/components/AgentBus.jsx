@@ -16,7 +16,7 @@ const short = (a = '') => a.replace(' Agent', '')
  * Live view of the message bus: what each agent published, and which conversation
  * (correlation id) it belongs to. Messages of one trigger share a colour stripe.
  */
-export default function AgentBus({ className = '', max = 40 }) {
+export default function AgentBus({ className = '', max = 40, title = 'Agent communication (message bus)', bodyClass = 'max-h-96 overflow-y-auto' }) {
   const { tick } = useApp()
   const [messages, setMessages] = useState([])
   const since = useRef(0)
@@ -53,7 +53,7 @@ export default function AgentBus({ className = '', max = 40 }) {
   const stripe = (id) => ['#3b82f6', '#22d3ee', '#a78bfa', '#f59e0b', '#22c55e'][convs.indexOf(id) % 5]
 
   return (
-    <Panel title="Agent communication (message bus)" className={className} bodyClass="max-h-96 overflow-y-auto"
+    <Panel title={title} className={className} data-testid="agent-bus" bodyClass={bodyClass}
            right={<Badge tone="slate">{messages.length} message(s)</Badge>}>
       {rows.length === 0 ? (
         <p className="text-sm text-slate-400">
@@ -65,7 +65,7 @@ export default function AgentBus({ className = '', max = 40 }) {
           {rows.map((msg) => {
             const I = AGENT_ICON[msg.sender] || MessageSquareShare
             return (
-              <li key={msg.id} className="flex gap-2.5 rounded-lg border border-line bg-space-900/60 p-2.5"
+              <li key={msg.id} data-testid="agent-bus-item" data-topic={msg.topic} className="flex gap-2.5 rounded-lg border border-line bg-space-900/60 p-2.5"
                   style={{ borderLeft: `3px solid ${stripe(msg.correlation_id)}` }}>
                 <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-space-600 text-accent-soft">
                   <I size={15} />

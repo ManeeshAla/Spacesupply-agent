@@ -1,5 +1,6 @@
 import { AlertTriangle, ArrowRight, Info, OctagonAlert, Zap } from 'lucide-react'
 import { CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import AgentBus from '../components/AgentBus'
 import Chat from '../components/Chat'
 import { LiveControls, LiveFeed } from '../components/Live'
 import Rocket from '../components/Rocket'
@@ -80,11 +81,15 @@ export default function Dashboard({ go, openComponent, openTask }) {
         </ResponsiveContainer>
       </Panel>
 
+      {/* the two live feeds sit side by side: what the plant is doing, and what the agents
+          are saying to each other about it */}
       <Panel title="Live activity" className="col-span-12 h-[320px] xl:col-span-8" right={<LiveControls compact />}>
         <LiveFeed />
       </Panel>
 
-      <Panel title="Upcoming deliveries" className="col-span-12 h-[320px] xl:col-span-4" right={<button className="text-xs text-accent-soft hover:underline" onClick={() => go('inventory')}>View all <ArrowRight size={11} className="inline" /></button>}>
+      <AgentBus className="col-span-12 h-[320px] xl:col-span-4" max={14} bodyClass="overflow-y-auto" />
+
+      <Panel title="Upcoming deliveries" className="col-span-12 h-[320px] xl:col-span-8" right={<button className="text-xs text-accent-soft hover:underline" onClick={() => go('inventory')}>View all <ArrowRight size={11} className="inline" /></button>}>
         <div className="h-full overflow-y-auto"><table className="w-full"><thead><tr><th className="th">ID</th><th className="th">Component</th><th className="th">ETA</th><th className="th">Supplier</th></tr></thead>
           <tbody>{d.deliveries.length === 0 && <tr><td colSpan={4} className="td text-sm text-slate-400">All deliveries received.</td></tr>}{d.deliveries.map((x) => (
             <tr key={x.id} onClick={() => openComponent(x.component_id)} className="cursor-pointer border-t border-line/50 hover:bg-space-700/60">

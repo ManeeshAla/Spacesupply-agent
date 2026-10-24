@@ -232,7 +232,7 @@ function Layout({ page, setPage, openSim, openComponent, openTask }) {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-base font-bold leading-tight text-white">Launch Vehicle Assembly Control</h1>
-              <div className="flex items-center gap-2 text-[11px] text-slate-400"><LiveDot />Simulated plant time: {d ? new Date(d.now_iso).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '…'}</div>
+              <div className="flex items-center gap-2 text-[11px] text-slate-400" data-testid="plant-clock" data-now={d?.now_iso || ''}><LiveDot />Simulated plant time: {d ? new Date(d.now_iso).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '…'}</div>
             </div>
             <div className="flex items-center gap-2">
               <LiveControls />

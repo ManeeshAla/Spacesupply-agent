@@ -2,9 +2,9 @@ import { X } from 'lucide-react'
 
 export const STAGE_COLORS = { 1: '#22c55e', 2: '#3b82f6', 3: '#f59e0b', 4: '#94a3b8' }
 
-export function Panel({ title, right, children, className = '', bodyClass = '' }) {
+export function Panel({ title, right, children, className = '', bodyClass = '', ...rest }) {
   return (
-    <section className={`panel flex flex-col ${className}`}>
+    <section className={`panel flex flex-col ${className}`} {...rest}>
       {(title || right) && (
         <header className="flex items-center justify-between px-4 pt-3 pb-2">
           <h3 className="panel-title">{title}</h3>
